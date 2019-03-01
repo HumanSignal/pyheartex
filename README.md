@@ -23,7 +23,7 @@ Assume your project is configured as follows:
   </TextEditor>
 </View>
 ```
-and you upload the data:
+and you are uploading the data:
 ```json
 [
   {"data": {"my_text": "сat says miaou"}},
