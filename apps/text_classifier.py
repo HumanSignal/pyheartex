@@ -9,6 +9,7 @@ from marisa_trie import RecordTrie
 from functools import partial
 from urllib.request import urlretrieve
 from tqdm import tqdm
+from mosestokenizer import MosesTokenizer
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import FunctionTransformer
@@ -18,24 +19,24 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from htx import run_model_server
 
-tokenizer_script = './tools/tokenizer.perl'
-
 
 logger = logging.getLogger(__name__)
 
 
-def tokenize(list_of_strings):
-    tokenizer_proc = subprocess.run(
-        [tokenizer_script, '-q'],
-        stdout=subprocess.PIPE,
-        input='\n'.join(list_of_strings),
-        stderr=subprocess.STDOUT,
-        encoding='utf-8'
-    )
-    if tokenizer_proc.returncode != 0:
-        raise ValueError('Tokenizer failed.')
-    output = [text.strip().split() for text in tokenizer_proc.stdout.strip().split('\n')]
-    return output
+def tokenize(list_of_strings, lang='en'):
+    with MosesTokenizer(lang) as tokenizer:
+        return list(map(tokenizer, list_of_strings))
+    # tokenizer_proc = subprocess.run(
+    #     ['./tools/tokenizer.perl', '-q'],
+    #     stdout=subprocess.PIPE,
+    #     input='\n'.join(list_of_strings),
+    #     stderr=subprocess.STDOUT,
+    #     encoding='utf-8'
+    # )
+    # if tokenizer_proc.returncode != 0:
+    #     raise ValueError('Tokenizer failed.')
+    # output = [text.strip().split() for text in tokenizer_proc.stdout.strip().split('\n')]
+    # return output
 
 
 def load_embeddings_data(model_dir, lang, words_limit):
