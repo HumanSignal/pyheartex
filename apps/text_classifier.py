@@ -122,7 +122,8 @@ def get_text_classifier_model(embedding_file_prefix=None):
 @click.option('--data-field', help='key to extract target data from task', required=True)
 @click.option('--update-period', help='model update period in samples', type=int, default=1)
 @click.option('--min-examples', help='min examples to start training', type=int, default=1)
-def main(lang, words_limit, model_dir, from_name, to_name, data_field, update_period, min_examples):
+@click.option('--port', help='server port', default='10001')
+def main(lang, words_limit, model_dir, from_name, to_name, data_field, update_period, min_examples, port):
     logging.basicConfig(level=logging.DEBUG)
     embedding_file_prefix = load_embeddings_data(model_dir, lang, words_limit)
     run_model_server(
@@ -132,7 +133,8 @@ def main(lang, words_limit, model_dir, from_name, to_name, data_field, update_pe
         min_examples_for_train=min_examples,
         from_name=from_name,
         to_name=to_name,
-        data_field=data_field
+        data_field=data_field,
+        port=port
     )
 
 
