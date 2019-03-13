@@ -78,7 +78,6 @@ def run_model_server(create_model_func, model_dir, from_name, to_name, data_fiel
 @_server.before_first_request
 def _start_train_loop():
     train_process = mp.Process(target=_model_manager.train_loop, args=(_model_manager.queue, ))
-    train_process.daemon = True
     train_process.start()
 
 
@@ -86,10 +85,11 @@ def _start_train_loop():
 def _predict():
     data = json.loads(request.data)
     results = _model_manager.predict(data)
-    return jsonify({
+    response = {
         'results': results,
         'model_version': _model_manager.model_version
-    })
+    }
+    return jsonify(response)
 
 
 @_server.route('/update', methods=['POST'])
