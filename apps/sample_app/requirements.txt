@@ -1,2 +1,2 @@
--e git+https://github.com/niklub/pyheartex.git@apps-for-text-image-classifier#egg=pyheartex
+-e git+https://github.com/niklub/pyheartex.git@apps-for-text-image-classifier#egg=htx
 scikit-learn==0.20.3
