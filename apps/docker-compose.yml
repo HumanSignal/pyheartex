@@ -1,0 +1,32 @@
+version: "3"
+services:
+  sample_app:
+    # replace username/repo:tag with your name and image details
+    build:
+      context: ./sample_app
+    image: sample_app:1
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 500M
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "10000:80"
+  image_classifier:
+    # replace username/repo:tag with your name and image details
+    build:
+      context: ./image_classifier
+    image: image_classifier:1
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 500M
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "10001:80"

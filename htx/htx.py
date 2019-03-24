@@ -4,7 +4,7 @@ import multiprocessing as mp
 from functools import wraps
 from flask import Flask, request, jsonify
 
-from htx.model_manager import ModelManager
+from htx.model_manager import ModelManager, ClassifierModelManager
 
 
 _server = Flask('htx.server')
@@ -60,10 +60,21 @@ def run(**kwargs):
 _model_manager = None
 
 
-def run_model_server(create_model_func, model_dir, from_name, to_name, data_field, min_examples_for_train=10,
-                     retrain_after_num_examples=10, **kwargs):
+def run_model_server(create_model_func, model_dir, min_examples_for_train=10, retrain_after_num_examples=10, **kwargs):
     global _model_manager
     _model_manager = ModelManager(
+        create_model_func=create_model_func,
+        model_dir=model_dir,
+        min_examples_for_train=min_examples_for_train,
+        retrain_after_num_examples=retrain_after_num_examples
+    )
+    run(**kwargs)
+
+
+def run_classifier_model_server(create_model_func, model_dir, from_name, to_name, data_field, min_examples_for_train=10,
+                     retrain_after_num_examples=10, **kwargs):
+    global _model_manager
+    _model_manager = ClassifierModelManager(
         create_model_func=create_model_func,
         model_dir=model_dir,
         from_name=from_name,

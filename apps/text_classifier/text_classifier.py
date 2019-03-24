@@ -1,4 +1,3 @@
-import subprocess
 import numpy as np
 import logging
 import click
@@ -19,6 +18,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from htx import run_model_server
 
+from htx.base_model import ChoicesBaseModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +27,6 @@ logger = logging.getLogger(__name__)
 def tokenize(list_of_strings, lang='en'):
     with MosesTokenizer(lang) as tokenizer:
         return list(map(tokenizer, list_of_strings))
-    # tokenizer_proc = subprocess.run(
-    #     ['./tools/tokenizer.perl', '-q'],
-    #     stdout=subprocess.PIPE,
-    #     input='\n'.join(list_of_strings),
-    #     stderr=subprocess.STDOUT,
-    #     encoding='utf-8'
-    # )
-    # if tokenizer_proc.returncode != 0:
-    #     raise ValueError('Tokenizer failed.')
-    # output = [text.strip().split() for text in tokenizer_proc.stdout.strip().split('\n')]
-    # return output
 
 
 def load_embeddings_data(model_dir, lang, words_limit):
@@ -100,17 +90,23 @@ class WordEmbeddings(TransformerMixin):
         return output
 
 
-def get_text_classifier_model(embedding_file_prefix=None):
-    if not embedding_file_prefix:
+class TextClassifier(ChoicesBaseModel):
+
+    def __init__(self, embedding_file_prefix=None, **kwargs):
+        super().__init__(**kwargs)
+        self.embedding_file_prefix = embedding_file_prefix
+
+    def create_model(self):
+        if not self.embedding_file_prefix:
+            return make_pipeline(
+                TfidfVectorizer(),
+                LogisticRegression(multi_class='multinomial', solver='lbfgs')
+            )
         return make_pipeline(
-            TfidfVectorizer(),
+            FunctionTransformer(tokenize, validate=False, check_inverse=False),
+            WordEmbeddings(f'{self.embedding_file_prefix}.words.marisa', f'{self.embedding_file_prefix}.vectors.npy'),
             LogisticRegression(multi_class='multinomial', solver='lbfgs')
         )
-    return make_pipeline(
-        FunctionTransformer(tokenize, validate=False, check_inverse=False),
-        WordEmbeddings(f'{embedding_file_prefix}.words.marisa', f'{embedding_file_prefix}.vectors.npy'),
-        LogisticRegression(multi_class='multinomial', solver='lbfgs')
-    )
 
 
 @click.command()
@@ -124,16 +120,19 @@ def get_text_classifier_model(embedding_file_prefix=None):
 @click.option('--min-examples', help='min examples to start training', type=int, default=1)
 @click.option('--port', help='server port', default='10001')
 def main(lang, words_limit, model_dir, from_name, to_name, data_field, update_period, min_examples, port):
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARNING)
     embedding_file_prefix = load_embeddings_data(model_dir, lang, words_limit)
     run_model_server(
-        create_model_func=partial(get_text_classifier_model, embedding_file_prefix=embedding_file_prefix),
+        create_model_func=partial(
+            TextClassifier,
+            embedding_file_prefix=embedding_file_prefix,
+            from_name=from_name,
+            to_name=to_name,
+            data_field=data_field
+        ),
         model_dir=model_dir,
         retrain_after_num_examples=update_period,
         min_examples_for_train=min_examples,
-        from_name=from_name,
-        to_name=to_name,
-        data_field=data_field,
         port=port
     )
 

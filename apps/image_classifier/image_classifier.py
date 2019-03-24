@@ -4,7 +4,9 @@ import os
 import torch
 import numpy as np
 
+from functools import partial
 from htx import run_model_server
+from htx.base_model import ChoicesBaseModel
 from urllib.request import urlretrieve
 
 from sklearn.linear_model import LogisticRegression
@@ -57,7 +59,7 @@ class ImageClassifierDataset(Dataset):
         return len(self.inputs)
 
 
-class ImageClassifier(object):
+class ImageClassifierModel(object):
 
     def __init__(self, image_folder):
         self.image_folder = image_folder
@@ -91,8 +93,17 @@ class ImageClassifier(object):
             tensor_X = resnet(preprocessed_images)
             tensor_X = torch.reshape(tensor_X, (tensor_X.size(0), tensor_X.size(1)))
             X = tensor_X.data.numpy()
-        print(X.shape)
         return self._model.predict_proba(X)
+
+
+class ImageClassifier(ChoicesBaseModel):
+
+    def __init__(self, image_folder, **kwargs):
+        super().__init__(**kwargs)
+        self.image_folder = image_folder
+
+    def create_model(self):
+        return ImageClassifierModel(self.image_folder)
 
 
 @click.command()
@@ -107,13 +118,16 @@ class ImageClassifier(object):
 def main(image_folder, model_dir, from_name, to_name, data_field, update_period, min_examples, port):
     logging.basicConfig(level=logging.DEBUG)
     run_model_server(
-        create_model_func=lambda: ImageClassifier(image_folder),
+        create_model_func=partial(
+            ImageClassifier,
+            image_folder=image_folder,
+            from_name=from_name,
+            to_name=to_name,
+            data_field=data_field
+        ),
         model_dir=model_dir,
         retrain_after_num_examples=update_period,
         min_examples_for_train=min_examples,
-        from_name=from_name,
-        to_name=to_name,
-        data_field=data_field,
         port=port
     )
 
