@@ -4,7 +4,7 @@ import multiprocessing as mp
 from functools import wraps
 from flask import Flask, request, jsonify
 
-from htx.model_manager import ModelManager, ClassifierModelManager
+from model_manager import ModelManager
 
 
 _server = Flask('htx.server')
