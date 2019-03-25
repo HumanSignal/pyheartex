@@ -1,0 +1,51 @@
+version: "3"
+services:
+  sample_app:
+    build:
+      context: ../sample_app
+    ports:
+      - "10000:80"
+
+  image_classifier:
+    build:
+      context: ../image_classifier
+    ports:
+      - "10001:80"
+
+#  ranker:
+#    build:
+#      context: ../ranker
+#    ports:
+#      - "10002:80"
+#
+#  text_classifier_en:
+#    build:
+#      context: ../text_classifier
+#      args:
+#        lang: en
+#    ports:
+#      - "10003:80"
+#
+#  text_classifier_ru:
+#    build:
+#      context: ../text_classifier
+#      args:
+#        lang: ru
+#    ports:
+#      - "10004:80"
+#
+#  text_classifier_fr:
+#    build:
+#      context: ../text_classifier
+#      args:
+#        lang: fr
+#    ports:
+#      - "10005:80"
+#
+#  text_classifier_es:
+#    build:
+#      context: ../text_classifier
+#      args:
+#        lang: es
+#    ports:
+#      - "10006:80"
