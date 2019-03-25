@@ -1,16 +1,29 @@
 version: "3"
 services:
+
+#  nginx:
+#    image: webapp-nginx
+#    build:
+#      context: .
+#      dockerfile: Dockerfile-nginx
+#    ports:
+#      - 5000:80
+#    depends_on:
+#      - sample_app
+#      - image_classifier
+
   sample_app:
     build:
       context: ../sample_app
-    ports:
-      - "10000:80"
+    volumes:
+      - "../sample_app:/app"
 
   image_classifier:
     build:
       context: ../image_classifier
-    ports:
-      - "10001:80"
+    volumes:
+      - "../image_classifier:/app"
+
 
 #  ranker:
 #    build:
