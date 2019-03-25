@@ -1,4 +1,4 @@
-FROM niklub/pyheartex:apps
+FROM python:3.7
 ADD . /app
 WORKDIR /app
 EXPOSE 80

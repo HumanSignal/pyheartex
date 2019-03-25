@@ -1,0 +1,2 @@
+scikit-learn==0.20.3
+-e git+https://github.com/niklub/pyheartex.git@apps-for-text-image-classifier#egg=htx
