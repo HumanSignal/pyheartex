@@ -1,15 +1,8 @@
 FROM python:3.7
+RUN pip install uwsgi
 ADD . /app
 WORKDIR /app
-EXPOSE 80
+EXPOSE 10001
 RUN mkdir models && mkdir images
-CMD ["python", "image_classifier.py", \
-    "--model-dir=models", \
-    "--image-folder=images", \
-    "--from-name=image_class", \
-    "--to-name=image_class", \
-    "--data-field=image", \
-    "--update-period=10", \
-    "--min-examples=10", \
-    "--port=80" \
-]
+RUN pip install uwsgi
+CMD ["uwsgi", "--ini", "wsgi.ini"]

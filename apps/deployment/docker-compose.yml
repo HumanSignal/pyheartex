@@ -15,14 +15,10 @@ services:
   sample_app:
     build:
       context: ../sample_app
-    volumes:
-      - "../sample_app:/app"
 
   image_classifier:
     build:
       context: ../image_classifier
-    volumes:
-      - "../image_classifier:/app"
 
 
 #  ranker:

@@ -71,19 +71,14 @@ def run_model_server(create_model_func, model_dir, min_examples_for_train=10, re
     run(**kwargs)
 
 
-def run_classifier_model_server(create_model_func, model_dir, from_name, to_name, data_field, min_examples_for_train=10,
-                     retrain_after_num_examples=10, **kwargs):
+def init_model_server(create_model_func, model_dir, min_examples_for_train=10, retrain_after_num_examples=10):
     global _model_manager
-    _model_manager = ClassifierModelManager(
+    _model_manager = ModelManager(
         create_model_func=create_model_func,
         model_dir=model_dir,
-        from_name=from_name,
-        to_name=to_name,
-        data_field=data_field,
         min_examples_for_train=min_examples_for_train,
         retrain_after_num_examples=retrain_after_num_examples
     )
-    run(**kwargs)
 
 
 @_server.before_first_request
@@ -110,7 +105,8 @@ def _update():
     return jsonify({'status': 'ok'})
 
 
-@_server.route('/version', methods=['POST'])
+@_server.route('/setup', methods=['POST'])
 def _setup():
-    _model_manager.setup()
+    data = json.loads(request.data)
+    _model_manager.setup(project=data['project'])
     return jsonify({'model_version': _model_manager.model_version})
