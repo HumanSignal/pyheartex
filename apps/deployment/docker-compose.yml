@@ -6,55 +6,61 @@ services:
 #    build:
 #      context: .
 #      dockerfile: Dockerfile-nginx
-#    ports:
-#      - 5000:80
 #    depends_on:
 #      - sample_app
 #      - image_classifier
+#      - ranker
+#      - text_classifier_en
+#      - text_classifier_ru
+#      - text_classifier_es
+#      - text_classifier_fr
 
   sample_app:
     build:
       context: ../sample_app
+    ports:
+      - 10000:9090
 
   image_classifier:
     build:
       context: ../image_classifier
-
+    ports:
+      - 10001:9090
 
 #  ranker:
 #    build:
 #      context: ../ranker
 #    ports:
-#      - "10002:80"
+#      - 10002:10002
 #
-#  text_classifier_en:
-#    build:
-#      context: ../text_classifier
-#      args:
-#        lang: en
-#    ports:
-#      - "10003:80"
-#
-#  text_classifier_ru:
-#    build:
-#      context: ../text_classifier
-#      args:
-#        lang: ru
-#    ports:
-#      - "10004:80"
-#
-#  text_classifier_fr:
-#    build:
-#      context: ../text_classifier
-#      args:
-#        lang: fr
-#    ports:
-#      - "10005:80"
-#
-#  text_classifier_es:
-#    build:
-#      context: ../text_classifier
-#      args:
-#        lang: es
-#    ports:
-#      - "10006:80"
+  text_classifier_en:
+    environment:
+      - lang=en
+    build:
+      context: ../text_classifier
+    ports:
+      - 10003:9090
+
+  text_classifier_ru:
+    environment:
+      - lang=ru
+    build:
+      context: ../text_classifier
+    ports:
+      - 10004:9090
+
+  text_classifier_fr:
+    environment:
+      - lang=fr
+    build:
+      context: ../text_classifier
+    ports:
+      - 10005:9090
+
+  text_classifier_es:
+    environment:
+      - lang=es
+    build:
+      context: ../text_classifier
+    ports:
+      - 10006:9090

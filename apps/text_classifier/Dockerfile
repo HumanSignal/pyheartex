@@ -1,17 +1,8 @@
-FROM niklub/pyheartex:apps
-ARG lang
+FROM python:3.7
+RUN pip install uwsgi
 ADD . /app
 WORKDIR /app
-EXPOSE 80
+EXPOSE 9090
 RUN pip install -r requirements.txt
 RUN mkdir models
-CMD ["python", "text_classifier.py", \
-    "--model-dir=models", \
-    "--lang=$lang", \
-    "--from-name=text_class", \
-    "--to-name=text_class", \
-    "--data-field=text", \
-    "--update-period=10", \
-    "--min-examples=10", \
-    "--port=80" \
-]
+CMD ["uwsgi", "--ini", "wsgi.ini"]

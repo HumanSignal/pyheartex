@@ -1,12 +1,8 @@
-FROM niklub/pyheartex:apps
+FROM python:3.7
+RUN pip install uwsgi
 ADD . /app
 WORKDIR /app
-EXPOSE 80
+EXPOSE 10002
 RUN pip install -r requirements.txt
 RUN mkdir models
-CMD ["python", "ranker.py", \
-    "--model-dir=models", \
-    "--update-period=10", \
-    "--min-examples=10", \
-    "--port=80" \
-]
+CMD ["uwsgi", "--ini", "wsgi.ini"]

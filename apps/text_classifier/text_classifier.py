@@ -30,6 +30,8 @@ def tokenize(list_of_strings, lang='en'):
 
 
 def load_embeddings_data(model_dir, lang, words_limit):
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
     target_file_name = f'cc.{lang}.300.vec.gz'
     target_file = os.path.join(model_dir, target_file_name)
     output_file_prefix = os.path.splitext(target_file)[0] + '.vectors.npy'

@@ -1,14 +1,13 @@
 from htx import app, init_model_server
 from functools import partial
-from image_classifier import ImageClassifier
+from ranker import Ranker
 
 init_model_server(
     create_model_func=partial(
-        ImageClassifier,
-        image_folder='images',
-        from_name='image_class',
-        to_name='image_class',
-        data_field='image'
+        Ranker,
+        from_name='ranker',
+        to_name='ranker',
+        data_field='ranked'
     ),
     model_dir='models',
     retrain_after_num_examples=10,
