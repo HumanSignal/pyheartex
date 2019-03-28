@@ -1,22 +1,35 @@
 import click
 import logging
 import numpy as np
+import json
 
 from operator import itemgetter
 from htx import run_model_server
 from htx.base_model import BaseModel
 import xgboost as xgb
 
-from text_classifier import load_embeddings_data, tokenize, WordEmbeddings
+
+logger = logging.getLogger(__name__)
+
+#from text_classifier import load_embeddings_data, tokenize, WordEmbeddings
 
 
-prefix = load_embeddings_data('word_models', lang='ru', words_limit=100000)
-word_embeddings = WordEmbeddings(f'{prefix}.words.marisa', f'{prefix}.vectors.npy')
+# prefix = load_embeddings_data('word_models', lang='ru', words_limit=100000)
+# word_embeddings = WordEmbeddings(f'{prefix}.words.marisa', f'{prefix}.vectors.npy')
+#
+#
+# def texts_to_embeddings(texts):
+#     normalized_texts = tokenize(texts)
+#     return word_embeddings.transform(normalized_texts)
+
+def get_snm():
+    logger.info('Start loading SMN...')
+    x = np.load('data/embeddings_matrix_SMN_22_a.npz')['arr_0']
+    logger.info('SMN loaded!')
+    return x
 
 
-def texts_to_embeddings(texts):
-    normalized_texts = tokenize(texts)
-    return word_embeddings.transform(normalized_texts)
+smn = get_snm()
 
 
 class Ranker(BaseModel):
@@ -34,41 +47,50 @@ class Ranker(BaseModel):
 
     def _extract_left(self, task):
         # TODO: make generic
-        if 'features' in task['meta'].get('question', {}):
-            return np.array(task['meta']['question']['features'])
-        else:
-            return np.mean(texts_to_embeddings(task['data']['questions']), axis=0)
+        # if 'features' in task['meta'].get('question', {}):
+        #     return np.array(task['meta']['question']['features'])
+        # else:
+        #     return np.mean(texts_to_embeddings(task['data']['questions']), axis=0)
+        pass
 
     def _extract_rights(self, task):
         # TODO: make generic
-        if 'features' in task['meta'].get('replies', {}):
-            return np.array(list(map(itemgetter('features'), task['meta']['replies'])))
-        else:
-            #print(json.dumps(task, indent=2))
-            return texts_to_embeddings(list(map(itemgetter('text'), task['data']['answers'])))
+        # if 'features' in task['meta'].get('replies', {}):
+        #     return np.array(list(map(itemgetter('features'), task['meta']['replies'])))
+        # else:
+        #     #print(json.dumps(task, indent=2))
+        #     return texts_to_embeddings(list(map(itemgetter('text'), task['data']['answers'])))
+        pass
 
     def _extract_labels(self, task):
         # TODO: make generic
-        return np.array(task['result'][0]['value']['weights'])
+        selected = np.array(task['result'][0]['value']['selected'])
+        weights = np.array(task['result'][0]['value']['weights'])
+        return selected * weights
+
+    def _get_features(self, task):
+        return np.vstack([smn[i] for i in map(itemgetter('smn_features'), task['meta']['replies'])])
+
+        # rvs = self._extract_rights(task)
+        # lv = self._extract_left(task)
+        #
+        # num_rvs = rvs.shape[0]
+        # final_features = np.hstack([
+        #     np.dot(rvs, lv)[:, None],
+        #     np.hstack((np.tile(lv, (num_rvs, 1)), rvs)),
+        #     np.abs(rvs - lv),
+        #     rvs * lv
+        # ])
+        # return final_features
 
     def _get_inputs(self, tasks):
         if not len(tasks):
             raise ValueError('Empty inputs')
         out, groups = [], []
         for task in tasks:
-            rvs = self._extract_rights(task)
-            lv = self._extract_left(task)
-
-            num_rvs = rvs.shape[0]
-            final_features = np.hstack([
-                np.dot(rvs, lv)[:, None],
-                np.hstack((np.tile(lv, (num_rvs, 1)), rvs)),
-                np.abs(rvs - lv),
-                rvs * lv
-            ])
-            #final_features = np.dot(rvs, lv)[:, None]
+            final_features = self._get_features(task)
             out.append(final_features)
-            groups.append(rvs.shape[0])
+            groups.append(final_features.shape[0])
         return np.vstack(out) if len(out) > 1 else out[0], groups
 
     def _get_outputs(self, tasks):
@@ -83,7 +105,7 @@ class Ranker(BaseModel):
                 'result': [{
                     'from_name': 'ranker',
                     'to_name': 'ranker',
-                    'value': {'weights': group_scores.tolist()}
+                    'value': {'weights': group_scores.tolist(), 'selected': [0] * len(group_scores)}
                 }],
                 'score': 1.0
             })

@@ -16,24 +16,28 @@ services:
 #      - text_classifier_fr
 
   sample_app:
+    container_name: sample_app
     build:
       context: ../sample_app
     ports:
       - 10000:9090
 
   image_classifier:
+    container_name: image_classifier
     build:
       context: ../image_classifier
     ports:
       - 10001:9090
 
-#  ranker:
-#    build:
-#      context: ../ranker
-#    ports:
-#      - 10002:10002
-#
+  ranker:
+    container_name: ranker
+    build:
+      context: ../ranker
+    ports:
+      - 10002:9090
+
   text_classifier_en:
+    container_name: text_classifier_en
     environment:
       - lang=en
     build:
@@ -42,6 +46,7 @@ services:
       - 10003:9090
 
   text_classifier_ru:
+    container_name: text_classifier_ru
     environment:
       - lang=ru
     build:
@@ -50,6 +55,7 @@ services:
       - 10004:9090
 
   text_classifier_fr:
+    container_name: text_classifier_fr
     environment:
       - lang=fr
     build:
@@ -58,6 +64,7 @@ services:
       - 10005:9090
 
   text_classifier_es:
+    container_name: text_classifier_es
     environment:
       - lang=es
     build:

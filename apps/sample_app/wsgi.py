@@ -1,6 +1,6 @@
 from htx import app, init_model_server
 from functools import partial
-from sample_app import DummyClassifier
+from apps.sample_app.sample_app import DummyClassifier
 
 init_model_server(
     create_model_func=partial(

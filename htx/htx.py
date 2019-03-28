@@ -90,10 +90,10 @@ def _start_train_loop():
 @_server.route('/predict', methods=['POST'])
 def _predict():
     data = json.loads(request.data)
-    results = _model_manager.predict(data)
+    results, model_version = _model_manager.predict(data)
     response = {
         'results': results,
-        'model_version': _model_manager.model_version
+        'model_version': model_version
     }
     return jsonify(response)
 
@@ -108,5 +108,6 @@ def _update():
 @_server.route('/setup', methods=['POST'])
 def _setup():
     data = json.loads(request.data)
-    _model_manager.setup(project=data['project'])
-    return jsonify({'model_version': _model_manager.model_version})
+    project = data['project']
+    _model_manager.setup(project)
+    return jsonify({'model_version': _model_manager.get_model_version(project)})

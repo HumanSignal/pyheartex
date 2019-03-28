@@ -26,9 +26,8 @@ class ModelManager(object):
         self._current_model = {}
         self._current_model_version = {}
 
-    @property
-    def model_version(self):
-        return self._current_model_version
+    def get_model_version(self, project):
+        return self._current_model_version.get(project)
 
     def create_new_model(self):
         model = self.create_model_func()
@@ -36,7 +35,7 @@ class ModelManager(object):
         return model, version
 
     def load_model(self, model_version, project):
-        if model_version != self._current_model_version[project]:
+        if model_version != self._current_model_version.get(project):
             model_file = os.path.join(self.model_dir, str(project), model_version)
             self._current_model[project] = self.create_model_func()
             self._current_model[project].load(model_file)
@@ -70,16 +69,17 @@ class ModelManager(object):
         if self._current_model.get(project) is None:
             raise ValueError('Model is not loaded')
 
+        current_model_version = self.get_model_version(project)
         requested_model_version = request_data.get('model_version')
-        if self.model_version != requested_model_version:
+        if current_model_version != requested_model_version:
             raise ValueError(
-                f'Current model version "{self.model_version}" '
-                f'!= requested model version "{requested_model_version}"'
+                f'Current model version "{current_model_version}" '
+                f'!= requested model version "{requested_model_version}" for project {project}'
             )
         # self.load_model(requested_model_version)
         results = self._current_model[project].predict(request_data['tasks'])
 
-        return results
+        return results, current_model_version
 
     def update(self, request_data):
         self.queue.put((request_data,))

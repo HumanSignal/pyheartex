@@ -1,3 +1,7 @@
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 from htx import app, init_model_server
 from functools import partial
 from ranker import Ranker
@@ -10,8 +14,8 @@ init_model_server(
         data_field='ranked'
     ),
     model_dir='models',
-    retrain_after_num_examples=10,
-    min_examples_for_train=10
+    retrain_after_num_examples=100,
+    min_examples_for_train=100
 )
 
 if __name__ == "__main__":
