@@ -8,7 +8,7 @@ init_model_server(
         image_folder='images',
         from_name='image_class',
         to_name='image_class',
-        data_field='image'
+        data_field='image_url'
     ),
     model_dir='models',
     retrain_after_num_examples=10,

@@ -38,7 +38,7 @@ class ChoicesBaseModel(BaseModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._idx2label = {}
+        self._idx2label = []
 
     def get_inputs(self, tasks):
         inputs = []
@@ -68,8 +68,8 @@ class ChoicesBaseModel(BaseModel):
     def _encode_labels(self, outputs):
         unique_labels = np.unique(outputs)
         label2idx = {}
+        self._idx2label = list(unique_labels)
         for i, label in enumerate(unique_labels):
-            self._idx2label[i] = label
             label2idx[label] = i
         output_idx = [label2idx[l] for l in outputs]
         return output_idx
