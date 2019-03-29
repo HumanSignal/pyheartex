@@ -49,7 +49,7 @@ class ChoicesBaseModel(BaseModel):
     def get_outputs(self, tasks):
         outputs = []
         for task in tasks:
-            outputs.append(task['result'][0]['value']['labels'][0])
+            outputs.append(task['result'][0]['value']['choices'][0])
         return outputs
 
     def make_results(self, labels, scores):
@@ -59,7 +59,7 @@ class ChoicesBaseModel(BaseModel):
                 'result': [{
                     'from_name': self.from_name,
                     'to_name': self.to_name,
-                    'value': {'labels': [label]}
+                    'value': {'choices': [label]}
                 }],
                 'score': score
             })
