@@ -83,7 +83,7 @@ class ChoicesBaseModel(BaseModel):
         outputs = self.get_outputs(tasks)
         outputs_idx = self._encode_labels(outputs)
         if len(self._idx2label) < 2:
-            logger.warning(f'Only one class is presented: {self._idx2label.keys()}.'
+            logger.warning(f'Only one class is presented: {self._idx2label}.'
                            f' Need to collect more data...')
             return
         inputs = self.get_inputs(tasks)
