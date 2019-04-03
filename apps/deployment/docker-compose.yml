@@ -74,3 +74,12 @@ services:
       context: ../text_classifier
     ports:
       - 10006:9090
+
+  text_classifier_de:
+    container_name: text_classifier_de
+    environment:
+      - lang=de
+    build:
+      context: ../text_classifier
+    ports:
+      - 10007:9090
