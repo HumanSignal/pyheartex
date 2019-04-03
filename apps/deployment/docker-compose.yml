@@ -1,4 +1,4 @@
-version: "3"
+version: "3.5"
 services:
 
 #  nginx:
@@ -26,6 +26,7 @@ services:
     container_name: image_classifier
     build:
       context: ../image_classifier
+      shm_size: '2gb'
     ports:
       - 10001:9090
 
@@ -33,6 +34,8 @@ services:
     container_name: ranker
     build:
       context: ../ranker
+    volumes:
+      - /home/ubuntu/pyheartex/apps/ranker/data:/app/data
     ports:
       - 10002:9090
 

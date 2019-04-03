@@ -14,8 +14,8 @@ init_model_server(
         data_field='ranked'
     ),
     model_dir='models',
-    retrain_after_num_examples=100,
-    min_examples_for_train=100
+    retrain_after_num_examples=1,
+    min_examples_for_train=1
 )
 
 if __name__ == "__main__":
