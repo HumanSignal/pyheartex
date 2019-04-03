@@ -38,7 +38,7 @@ class ChoicesBaseModel(BaseModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._idx2label = {}
+        self._idx2label = []
 
     def get_inputs(self, tasks):
         inputs = []
@@ -49,7 +49,7 @@ class ChoicesBaseModel(BaseModel):
     def get_outputs(self, tasks):
         outputs = []
         for task in tasks:
-            outputs.append(task['result'][0]['value']['labels'][0])
+            outputs.append(task['result'][0]['value']['choices'][0])
         return outputs
 
     def make_results(self, labels, scores):
@@ -59,7 +59,7 @@ class ChoicesBaseModel(BaseModel):
                 'result': [{
                     'from_name': self.from_name,
                     'to_name': self.to_name,
-                    'value': {'labels': [label]}
+                    'value': {'choices': [label]}
                 }],
                 'score': score
             })
@@ -68,8 +68,8 @@ class ChoicesBaseModel(BaseModel):
     def _encode_labels(self, outputs):
         unique_labels = np.unique(outputs)
         label2idx = {}
+        self._idx2label = list(unique_labels)
         for i, label in enumerate(unique_labels):
-            self._idx2label[i] = label
             label2idx[label] = i
         output_idx = [label2idx[l] for l in outputs]
         return output_idx
@@ -83,7 +83,7 @@ class ChoicesBaseModel(BaseModel):
         outputs = self.get_outputs(tasks)
         outputs_idx = self._encode_labels(outputs)
         if len(self._idx2label) < 2:
-            logger.warning(f'Only one class is presented: {self._idx2label.keys()}.'
+            logger.warning(f'Only one class is presented: {self._idx2label}.'
                            f' Need to collect more data...')
             return
         inputs = self.get_inputs(tasks)
