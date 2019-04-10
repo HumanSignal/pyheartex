@@ -1,4 +1,5 @@
 FROM python:3.7
+RUN apt-get update && apt-get install net-tools
 RUN pip install uwsgi
 ADD . /app
 WORKDIR /app

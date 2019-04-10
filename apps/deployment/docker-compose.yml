@@ -30,14 +30,16 @@ services:
     ports:
       - 10001:9090
 
-  ranker:
-    container_name: ranker
-    build:
-      context: ../ranker
-    volumes:
-      - /home/ubuntu/pyheartex/apps/ranker/data:/app/data
-    ports:
-      - 10002:9090
+#  ranker:
+#    container_name: ranker
+#    build:
+#      context: ../ranker
+#      network: host
+##    network_mode: "host"
+#    volumes:
+#      - /home/ubuntu/pyheartex/apps/ranker/data:/app/data
+#    ports:
+#      - 10002:9090
 
   text_classifier_en:
     container_name: text_classifier_en

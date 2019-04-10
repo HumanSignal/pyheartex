@@ -2,6 +2,7 @@ import click
 import logging
 import numpy as np
 import json
+import requests
 
 from operator import itemgetter
 from htx import run_model_server
@@ -23,10 +24,11 @@ logger = logging.getLogger(__name__)
 #     return word_embeddings.transform(normalized_texts)
 
 def get_snm():
-    logger.info('Start loading SMN...')
-    x = np.load('data/embeddings_matrix_SMN_22_a.npz')['arr_0']
-    logger.info('SMN loaded!')
-    return x
+    return None
+    # logger.info('Start loading SMN...')
+    # x = np.load('data/embeddings_matrix_SMN_22_a.npz')['arr_0']
+    # logger.info('SMN loaded!')
+    # return x
 
 
 smn = get_snm()
@@ -45,56 +47,48 @@ class Ranker(BaseModel):
         }
         return xgb.sklearn.XGBRanker(**params)
 
-    def _extract_left(self, task):
-        # TODO: make generic
-        # if 'features' in task['meta'].get('question', {}):
-        #     return np.array(task['meta']['question']['features'])
-        # else:
-        #     return np.mean(texts_to_embeddings(task['data']['questions']), axis=0)
-        pass
+    def _get_smn_feature(self, task):
 
-    def _extract_rights(self, task):
-        # TODO: make generic
-        # if 'features' in task['meta'].get('replies', {}):
-        #     return np.array(list(map(itemgetter('features'), task['meta']['replies'])))
-        # else:
-        #     #print(json.dumps(task, indent=2))
-        #     return texts_to_embeddings(list(map(itemgetter('text'), task['data']['answers'])))
-        pass
+        context = list(map(itemgetter('text'), task['data']['context']))
+        replies = list(map(itemgetter('text'), task['data']['replies']))
 
-    def _extract_labels(self, task):
-        # TODO: make generic
-        selected = np.array(task['result'][0]['value']['selected'])
-        weights = np.array(task['result'][0]['value']['weights'])
-        return selected * weights
+        while len(context) < 10:
+            context.insert(0, '')
+        request_dict = {
+            'context': [context + replies]
+        }
+        r = requests.post(
+            url='http://127.0.0.1:5000/ranker',
+            data=json.dumps(request_dict, ensure_ascii=False).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        resp_dict = json.loads(r.text)[0]
+        scores = resp_dict[0]
+        embeddings = resp_dict[1]
+        return scores, embeddings
 
     def _get_features(self, task):
-        return np.vstack([smn[i] for i in map(itemgetter('smn_features'), task['meta']['replies'])])
 
-        # rvs = self._extract_rights(task)
-        # lv = self._extract_left(task)
-        #
-        # num_rvs = rvs.shape[0]
-        # final_features = np.hstack([
-        #     np.dot(rvs, lv)[:, None],
-        #     np.hstack((np.tile(lv, (num_rvs, 1)), rvs)),
-        #     np.abs(rvs - lv),
-        #     rvs * lv
-        # ])
-        # return final_features
+        _, embeddings = self._get_smn_feature(task)
+        return np.vstack(embeddings)
 
     def _get_inputs(self, tasks):
         if not len(tasks):
             raise ValueError('Empty inputs')
         out, groups = [], []
         for task in tasks:
-            final_features = self._get_features(task)
-            out.append(final_features)
-            groups.append(final_features.shape[0])
+            features = self._get_features(task)
+            out.append(features)
+            groups.append(features.shape[0])
         return np.vstack(out) if len(out) > 1 else out[0], groups
 
     def _get_outputs(self, tasks):
-        return np.hstack(list(map(self._extract_labels, tasks)))
+        out = []
+        for task in tasks:
+            selected = task['result'][0]['value']['selected']
+            weights = task['result'][0]['value']['weights']
+            out.append([s * w for s, w in zip(selected, weights)])
+        return np.hstack(out)
 
     def _make_results(self, scores, groups):
         start_idx = 0
