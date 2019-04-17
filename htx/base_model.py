@@ -11,10 +11,11 @@ logger = logging.getLogger(__name__)
 
 class BaseModel(ABC):
 
-    def __init__(self, data_field, from_name, to_name):
-        self.data_field = data_field
-        self.from_name = from_name
-        self.to_name = to_name
+    def __init__(self, tag_name, tag_type, source_name, source_type):
+        self.tag_name = tag_name
+        self.tag_type = tag_type
+        self.source_name = source_name
+        self.source_type = source_type
         self._model = None
 
     @abstractmethod
@@ -43,13 +44,17 @@ class ChoicesBaseModel(BaseModel):
     def get_inputs(self, tasks):
         inputs = []
         for task in tasks:
-            inputs.append(task['data'][self.data_field])
+            inputs.append(task['data'][self.source_name])
         return inputs
 
     def get_outputs(self, tasks):
         outputs = []
         for task in tasks:
-            outputs.append(task['result'][0]['value']['choices'][0])
+            single_choice = next((
+                r['value'][self.tag_type][0] for r in task['result']
+                if r['from_name'] == self.tag_name and r['to_name'] == self.source_name
+            ))
+            outputs.append(single_choice)
         return outputs
 
     def make_results(self, labels, scores):
@@ -57,9 +62,9 @@ class ChoicesBaseModel(BaseModel):
         for label, score in zip(labels, scores):
             results.append({
                 'result': [{
-                    'from_name': self.from_name,
-                    'to_name': self.to_name,
-                    'value': {'choices': [label]}
+                    'from_name': self.tag_name,
+                    'to_name': self.source_name,
+                    'value': {self.tag_type: [label]}
                 }],
                 'score': score
             })

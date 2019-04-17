@@ -26,6 +26,9 @@ class ModelManager(object):
         self._current_model = {}
         self._current_model_version = {}
 
+    def get_model(self, project):
+        return self._current_model.get(project)
+
     def get_model_version(self, project):
         return self._current_model_version.get(project)
 
@@ -52,7 +55,7 @@ class ModelManager(object):
             fout.write(model_version + '\n')
         logger.info(f'Model successfully saved to {output_model_file}')
 
-    def setup(self, project):
+    def setup(self, project, scheme=None):
         model_list_file = os.path.join(self.model_dir, str(project), self._MODEL_LIST_FILE)
         if not os.path.exists(model_list_file) or os.stat(model_list_file).st_size == 0:
             logger.error(f'{self.model_list_file} is doesn''t exist or empty')
@@ -63,6 +66,23 @@ class ModelManager(object):
             requested_model_version = model_list[-1]
             logger.info(f'Loading model version {requested_model_version}')
             self.load_model(requested_model_version, project)
+            if scheme:
+                model = self.get_model(project)
+                if not self._validate(model, scheme):
+                    error_msg = f'Current scheme {scheme} is not valid for model {project}'
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+                else:
+                    model.tag_name = scheme['tag_name']
+                    model.source_name = scheme['source_name']
+
+    @classmethod
+    def _validate(cls, model, scheme):
+        return model.tag_type == scheme['tag_type'] and model.source_type == scheme['source_type']
+
+    def validate(self, scheme):
+        model = self.create_model_func()
+        return self._validate(model, scheme)
 
     def predict(self, request_data):
         project = request_data['tasks'][0]['project']

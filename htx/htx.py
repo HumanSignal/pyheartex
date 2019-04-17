@@ -109,5 +109,14 @@ def _update():
 def _setup():
     data = json.loads(request.data)
     project = data['project']
-    _model_manager.setup(project)
+    scheme = data.get('scheme')
+    _model_manager.setup(project, scheme)
     return jsonify({'model_version': _model_manager.get_model_version(project)})
+
+
+@_server.route('/validate', methods=['GET'])
+def _validate():
+    data = json.loads(request.data)
+    scheme = data['scheme']
+    validation_result = _model_manager.validate(scheme)
+    return jsonify({'validation_result': validation_result})

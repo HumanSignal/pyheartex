@@ -14,9 +14,10 @@ init_model_server(
     create_model_func=partial(
         TextClassifier,
         embedding_file_prefix=embedding_file_prefix,
-        from_name='from_name',
-        to_name='to_name',
-        data_field='data'
+        tag_name='text_class',
+        tag_type='choices',
+        source_name='text',
+        source_type='text'
     ),
     model_dir='models',
     retrain_after_num_examples=10,

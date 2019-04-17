@@ -8,9 +8,10 @@ init_model_server(
     create_model_func=partial(
         ImageClassifier,
         image_folder='images',
-        from_name='image_class',
-        to_name='image',
-        data_field='image_url'
+        tag_type='choices',
+        tag_name='image_class',
+        source_type='image',
+        source_name='image_url'
     ),
     model_dir='models',
     retrain_after_num_examples=1,

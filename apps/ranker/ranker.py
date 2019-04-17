@@ -34,6 +34,23 @@ def get_snm():
 smn = get_snm()
 
 
+sber_features = np.load('text_ranker/features.npy')
+
+sources_dim = 9
+
+all_sources = {
+    "regex": 0,
+    "nano": 1,
+    "odqa": 2,
+    "chitchat": 3,
+    "ScenarioManager": 4,
+    "SerpSkill": 5,
+    "JokeSkill": 6,
+    "OrSkill": 7,
+    "ipavlov": 8
+}
+
+
 class Ranker(BaseModel):
 
     def _create_model(self):
@@ -65,12 +82,18 @@ class Ranker(BaseModel):
         resp_dict = json.loads(r.text)[0]
         scores = resp_dict[0]
         embeddings = resp_dict[1]
-        return scores, embeddings
+        return scores, np.vstack(embeddings)
 
     def _get_features(self, task):
 
-        _, embeddings = self._get_smn_feature(task)
-        return np.vstack(embeddings)
+        _, pav_feats = self._get_smn_feature(task)
+        idx = task['meta']['context'][0]['index_of_row_in_some_npy_file']
+        n = len(task['meta']['replies'])
+        sber_feats = np.tile(sber_features[idx], (n, 1))
+        source_feats = np.zeros((n, sources_dim))
+        for i, source in enumerate(task['meta']['replies']):
+            source_feats[i, all_sources[source['source']]] = 1
+        return np.hstack((pav_feats, sber_feats, source_feats))
 
     def _get_inputs(self, tasks):
         if not len(tasks):

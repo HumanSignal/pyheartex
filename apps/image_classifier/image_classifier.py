@@ -72,10 +72,10 @@ class ImageClassifierModel(object):
         X, y = [], []
         with no_grad():
             for batch_inputs, batch_outputs in dataloader:
-                    batch_X = resnet(batch_inputs)
-                    batch_X = torch.reshape(batch_X, (batch_X.size(0), batch_X.size(1)))
-                    X.append(batch_X.data.numpy())
-                    y.append(batch_outputs.data.numpy())
+                batch_X = resnet(batch_inputs)
+                batch_X = torch.reshape(batch_X, (batch_X.size(0), batch_X.size(1)))
+                X.append(batch_X.data.numpy())
+                y.append(batch_outputs.data.numpy())
 
         X = np.vstack(X)
         y = np.hstack(y)

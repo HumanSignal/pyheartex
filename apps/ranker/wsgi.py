@@ -9,9 +9,10 @@ from ranker import Ranker
 init_model_server(
     create_model_func=partial(
         Ranker,
-        from_name='ranker',
-        to_name='ranker',
-        data_field='ranked'
+        tag_name='ranker',
+        tag_type='list',
+        source_name='ranked',
+        source_type='ranker'
     ),
     model_dir='models',
     retrain_after_num_examples=1,
