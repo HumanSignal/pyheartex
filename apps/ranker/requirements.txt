@@ -1,4 +1,0 @@
-xgboost==0.82
-scikit-learn==0.20.3
-git+https://github.com/niklub/pyheartex.git@apps-for-text-image-classifier#egg=htx
-requests==2.21.0

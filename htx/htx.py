@@ -114,9 +114,12 @@ def _setup():
     return jsonify({'model_version': _model_manager.get_model_version(project)})
 
 
-@_server.route('/validate', methods=['GET'])
+@_server.route('/validate', methods=['POST'])
 def _validate():
     data = json.loads(request.data)
     scheme = data['scheme']
-    validation_result = _model_manager.validate(scheme)
-    return jsonify({'validation_result': validation_result})
+    validated = _model_manager.validate(scheme)
+    if validated:
+        return jsonify({'status': 'ok'})
+    else:
+        return jsonify({'status': 'failed'}), 422

@@ -78,7 +78,10 @@ class ModelManager(object):
 
     @classmethod
     def _validate(cls, model, scheme):
-        return model.tag_type == scheme['tag_type'] and model.source_type == scheme['source_type']
+        return (
+            model.tag_type.lower() == scheme['tag_type'].lower() and
+            model.source_type.lower() == scheme['source_type'].lower()
+        )
 
     def validate(self, scheme):
         model = self.create_model_func()
