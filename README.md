@@ -11,40 +11,59 @@ pip install -e .
 ```
 
 # Quick start
-Assume your project is configured as follows:
+Assume you want to build prediction service that classifies short texts onto 2 classes (e.g. cats/dogs).
+
+First thing you need to configure labeling project on [Heartex](www.heartex.net) (read [docs](http://go.heartex.net/static/docs/#/Business?id=create-new-project) for detailed explanation how to create projects on Heartex).
+
+Use the following labeling config:
 ```xml
 <View>
-  <TextEditor>
-    <Text name="my_text_1" value="# my_text #"></Text>
-    <Choices name="cats_or_dogs">
-      <Choice value="cats"></Choice>
-      <Choice value="dogs"></Choice>
-    </Choices>
-  </TextEditor>
+<Text name="my_text_1" value="$my_text"></Text>
+<Choices name="cats_or_dogs">
+  <Choice value="cats"></Choice>
+  <Choice value="dogs"></Choice>
+</Choices>
 </View>
 ```
-and you upload the data:
+Then you upload JSON file with the data:
 ```json
 [
-  {"data": {"my_text": "сat says miaou"}},
-  {"data": {"my_text": "dog says woof"}}
+  {"my_text": "сat says miaou"},
+  {"my_text": "dog says woof"}
 ]
 ```
-The following script runs prediction server at `http://localhost:8999`
+Heartex platform interacts with labelers and send data to the model server.
+The following scripts starts model server at `http://localhost:8999` with simple MaxEnt classifier by using [scikit-learn](https://scikit-learn.org/stable/)
 
 ```python
-import htx
+from htx import app, init_model_server
+from htx.base_model import ChoicesBaseModel
 
-@htx.predict(from_name='cats_or_dogs', to_name='my_text_1')
-def predict(data, *args, **kwargs):
-    results = []
-    for item in data:
-        results.append({
-            'labels': 'cats' if 'cat' in item['my_text'] else 'dogs'
-        })
-    return results
+from sklearn.pipeline import make_pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 
+
+class MaxEntClassifier(ChoicesBaseModel):
+
+    def create_model(self):
+        return make_pipeline(
+            TfidfVectorizer(),
+            LogisticRegression()
+        )
+
+init_model_server(
+    create_model_func=MaxEntClassifier,
+    model_dir='path/to/models/dir'
+)
 
 if __name__ == "__main__":
-    htx.run(host='localhost', port=8999)
+    app.run(host='localhost', port=8999)
+```
+
+Now you can send prediction request by using `TOKEN` and `PROJECT-ID` acquired [via Heartex]():
+```bash
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Token <TOKEN>" \
+-d '{"my_text": "is this cat or dog?"}' \
+http://go.heartex.net/api/projects/<PROJECT-ID>/predict
 ```
