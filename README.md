@@ -64,6 +64,6 @@ if __name__ == "__main__":
 Now you can send prediction request by using `TOKEN` and `PROJECT-ID` acquired [via Heartex]():
 ```bash
 curl -X POST -H "Content-Type: application/json" -H "Authorization: Token <TOKEN>" \
--d '{"my_text": "is this cat or dog?"}' \
+-d '[{"my_text": "is this cat or dog?"}]' \
 http://go.heartex.net/api/projects/<PROJECT-ID>/predict
 ```
