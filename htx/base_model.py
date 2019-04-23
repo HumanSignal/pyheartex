@@ -11,11 +11,12 @@ logger = logging.getLogger(__name__)
 
 class BaseModel(ABC):
 
-    def __init__(self, tag_name, tag_type, source_name, source_type):
+    def __init__(self, tag_type, source_type, tag_name=None, source_name=None, source_value=None):
         self.tag_name = tag_name
         self.tag_type = tag_type
         self.source_name = source_name
         self.source_type = source_type
+        self.source_value = source_value
         self._model = None
 
     @abstractmethod
@@ -34,26 +35,36 @@ class BaseModel(ABC):
     def load(self, filepath):
         pass
 
+    def __repr__(self):
+        return json.dumps(self.__dict__, indent=2)
+
 
 class ChoicesBaseModel(BaseModel):
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(tag_type='choices', **kwargs)
         self._idx2label = []
 
     def get_inputs(self, tasks):
         inputs = []
         for task in tasks:
-            inputs.append(task['data'][self.source_name])
+            inputs.append(task['data'][self.source_value])
         return inputs
 
     def get_outputs(self, tasks):
         outputs = []
         for task in tasks:
-            single_choice = next((
-                r['value'][self.tag_type][0] for r in task['result']
-                if r['from_name'] == self.tag_name and r['to_name'] == self.source_name
-            ))
+            single_choice = None
+            for r in task['result']:
+                if r['from_name'] == self.tag_name and r['to_name'] == self.source_name:
+                    single_choice = r['value'].get(self.tag_type)
+                    if isinstance(single_choice, list):
+                        single_choice = single_choice[0]
+                        break
+
+            if not single_choice:
+                raise ValueError(f'Cannot parse {task} with '
+                                 f'tag_name={self.tag_name}, source_name={self.source_name}, tag_type={self.tag_type}')
             outputs.append(single_choice)
         return outputs
 
@@ -90,12 +101,13 @@ class ChoicesBaseModel(BaseModel):
         if len(self._idx2label) < 2:
             logger.warning(f'Only one class is presented: {self._idx2label}.'
                            f' Need to collect more data...')
-            return
+            return False
         inputs = self.get_inputs(tasks)
 
         self._model = self.create_model()
 
         self._model.fit(inputs, outputs_idx)
+        return True
 
     def predict(self, tasks):
         inputs = self.get_inputs(tasks)

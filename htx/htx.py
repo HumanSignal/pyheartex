@@ -1,5 +1,6 @@
 import json
 import multiprocessing as mp
+import logging
 
 from functools import wraps
 from flask import Flask, request, jsonify
@@ -8,6 +9,8 @@ from htx.model_manager import ModelManager
 
 
 _server = Flask('htx.server')
+
+logger = logging.getLogger(__name__)
 
 
 def predict(from_name, to_name):
@@ -102,6 +105,7 @@ def _predict():
 def _update():
     data = json.loads(request.data)
     _model_manager.update(data)
+    logger.info(data)
     return jsonify({'status': 'ok'})
 
 
@@ -109,16 +113,16 @@ def _update():
 def _setup():
     data = json.loads(request.data)
     project = data['project']
-    scheme = data.get('scheme')
-    _model_manager.setup(project, scheme)
+    schema = data.get('schema')
+    _model_manager.setup(project, schema)
     return jsonify({'model_version': _model_manager.get_model_version(project)})
 
 
 @_server.route('/validate', methods=['POST'])
 def _validate():
     data = json.loads(request.data)
-    scheme = data['scheme']
-    validated = _model_manager.validate(scheme)
+    schema = data['schema']
+    validated = _model_manager.validate(schema)
     if validated:
         return jsonify({'status': 'ok'})
     else:
