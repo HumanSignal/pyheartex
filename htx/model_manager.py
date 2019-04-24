@@ -128,7 +128,7 @@ class ModelManager(object):
         return model and scheme and self._validate(model, scheme)
 
     def predict(self, request_data):
-        project = request_data['tasks'][0]['project']
+        project = request_data['project']
         if self._current_model.get(project) is None:
             raise ValueError('Model is not loaded')
 
