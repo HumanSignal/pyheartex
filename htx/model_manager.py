@@ -43,6 +43,8 @@ class ModelManager(object):
 
     def __init__(self, create_model_func, model_dir, min_examples_for_train=10, retrain_after_num_examples=10):
         self.model_dir = model_dir
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
         self.create_model_func = create_model_func
         self.min_examples_for_train = min_examples_for_train
         self.retrain_after_num_examples = retrain_after_num_examples
