@@ -4,7 +4,7 @@ Python interface for running ML backend server and using it for active learning 
 
 # Installation
 ```bash
-git clone https://github.com/niklub/pyheartex.git
+git clone https://github.com/heartexlabs/pyheartex.git
 cd pyheartex/
 pip install -r requirements.txt
 pip install -e .
