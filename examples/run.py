@@ -1,5 +1,6 @@
 import os
 import argparse
+import logging
 
 from htx import app, init_model_server
 from htx.base_model import TextClassifier
@@ -33,6 +34,7 @@ init_model_server(
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description='Example Heartex ML backend server with simple text classifier')
     parser.add_argument('--host', dest='host', help='Hostname', default='localhost')
     parser.add_argument('--port', dest='port', help='Port', type=int, default=8999)
