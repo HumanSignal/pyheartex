@@ -130,3 +130,15 @@ class ChoicesBaseModel(BaseModel):
             self._model = pickle.load(f)
         with open(labels_file) as f:
             self._idx2label = json.load(f)
+
+
+class TextClassifier(ChoicesBaseModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(source_type='text', **kwargs)
+
+
+class ImageClassifier(ChoicesBaseModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(source_type='image', **kwargs)

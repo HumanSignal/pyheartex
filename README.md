@@ -33,32 +33,13 @@ Then you upload JSON file with the data:
 ]
 ```
 Heartex platform interacts with labelers and send data to the model server.
-The following scripts starts model server at `http://localhost:8999` with simple MaxEnt classifier by using [scikit-learn](https://scikit-learn.org/stable/)
+The following scripts starts model server with simple text classifier
 
-```python
-from htx import app, init_model_server
-from htx.base_model import ChoicesBaseModel
-
-from sklearn.pipeline import make_pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-
-
-class MaxEntClassifier(ChoicesBaseModel):
-
-    def create_model(self):
-        return make_pipeline(
-            TfidfVectorizer(),
-            LogisticRegression()
-        )
-
-init_model_server(
-    create_model_func=MaxEntClassifier,
-    model_dir='path/to/models/dir'
-)
-
-if __name__ == "__main__":
-    app.run(host='localhost', port=8999)
+```bash
+cd examples/
+virtualenv -p python3 env && source env/bin/activate
+pip install -r examples-requirements.txt
+python run.py --host localhost --port 8999 --debug
 ```
 
 Now you can send prediction request by using `TOKEN` and `PROJECT-ID` acquired [via Heartex]():
