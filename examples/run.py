@@ -22,8 +22,8 @@ class MyTextClassifierOnHeartex(TextClassifier):
 
     def create_model(self):
         return make_pipeline(
-            TfidfVectorizer(),
-            LogisticRegression()
+            TfidfVectorizer(ngram_range=(1, 3)),
+            LogisticRegression(solver='lbfgs')
         )
 
 
