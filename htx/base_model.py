@@ -132,7 +132,79 @@ class ChoicesBaseModel(BaseModel):
             self._idx2label = json.load(f)
 
 
+class LabelsBaseModel(BaseModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(tag_type='labels', **kwargs)
+
+    def get_inputs(self, tasks):
+        inputs = []
+        for task in tasks:
+            inputs.append(task['data'][self.source_value])
+        return inputs
+
+    def get_outputs(self, tasks):
+        outputs = []
+        for task in tasks:
+            path = []
+            for r in task['result']:
+                if r['from_name'] == self.tag_name and r['to_name'] == self.source_name:
+                    labels = r['value'].get(self.tag_type)
+                    if not isinstance(labels, list) or len(labels) == 0:
+                        logger.warning(f'Error while parsing {r}: list type expected for "labels"')
+                        continue
+                    label = labels[0]
+                    start, end = r['value'].get('start'), r['value'].get('end')
+                    if not start or not end:
+                        logger.warning(f'Error while parsing {r}: '
+                                       f'{self.tag_type} should contain "start" and "end" fields')
+
+                    path.append((label, start, end))
+            outputs.append(path)
+        return outputs
+
+    def make_results(self, paths, scores):
+        results = []
+        for path, score in zip(paths, scores):
+            for tag, start, end in self._iter_spans(path):
+                results.append({
+                    'result': [{
+                        'from_name': self.tag_name,
+                        'to_name': self.source_name,
+                        'value': {
+                            self.tag_type: [tag],
+                            'start': start,
+                            'end': end
+                        }
+                    }],
+                    'score': score
+                })
+        return results
+
+    @abstractmethod
+    def create_model(self):
+        pass
+
+    def fit(self, tasks):
+        inputs = self.get_inputs(tasks)
+        outputs = self.get_outputs(tasks)
+        self._model = self.create_model()
+        self._model.fit(inputs, outputs)
+        return True
+
+    def predict(self, tasks):
+        inputs = self.get_inputs(tasks)
+        paths, scores = self._model.predict(inputs)
+        return self.make_results(paths, scores)
+
+
 class TextClassifier(ChoicesBaseModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(source_type='text', **kwargs)
+
+
+class TextTagger(LabelsBaseModel):
 
     def __init__(self, **kwargs):
         super().__init__(source_type='text', **kwargs)
