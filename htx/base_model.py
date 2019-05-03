@@ -163,6 +163,9 @@ class LabelsBaseModel(BaseModel):
             outputs.append(path)
         return outputs
 
+    def _iter_spans(self, path):
+        return (None, None, None)
+
     def make_results(self, paths, scores):
         results = []
         for path, score in zip(paths, scores):
