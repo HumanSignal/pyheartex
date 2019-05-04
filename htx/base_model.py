@@ -132,7 +132,93 @@ class ChoicesBaseModel(BaseModel):
             self._idx2label = json.load(f)
 
 
+class LabelsBaseModel(BaseModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(tag_type='labels', **kwargs)
+
+    def get_inputs(self, tasks):
+        inputs = []
+        for task in tasks:
+            inputs.append(task['data'][self.source_value])
+        return inputs
+
+    def get_outputs(self, tasks):
+        outputs = []
+        for task in tasks:
+            spans = []
+            for r in task['result']:
+                if r['from_name'] == self.tag_name and r['to_name'] == self.source_name:
+                    labels = r['value'].get(self.tag_type)
+                    if not isinstance(labels, list) or len(labels) == 0:
+                        logger.warning(f'Error while parsing {r}: list type expected for "labels"')
+                        continue
+                    label = labels[0]
+                    start, end = r['value'].get('start'), r['value'].get('end')
+                    if not start or not end:
+                        logger.warning(f'Error while parsing {r}: '
+                                       f'{self.tag_type} should contain "start" and "end" fields')
+                    spans.append({
+                        'label': label,
+                        'start': start,
+                        'end': end
+                    })
+            outputs.append(spans)
+        return outputs
+
+    def make_results(self, list_of_spans, scores):
+        list_results = []
+        for spans, score in zip(list_of_spans, scores):
+            results = []
+            for span in spans:
+                results.append({
+                    'result': [{
+                        'from_name': self.tag_name,
+                        'to_name': self.source_name,
+                        'value': {
+                            self.tag_type: [span['label']],
+                            'start': span['start'],
+                            'end': span['end'],
+                            'text': span['substr']
+                        }
+                    }],
+                    'score': score
+                })
+            list_results.append(results)
+        return list_results
+
+    @abstractmethod
+    def create_model(self):
+        pass
+
+    def fit(self, tasks):
+        inputs = self.get_inputs(tasks)
+        outputs = self.get_outputs(tasks)
+        self._model = self.create_model()
+        self._model.fit(inputs, outputs)
+        return True
+
+    def predict(self, tasks):
+        inputs = self.get_inputs(tasks)
+        list_of_spans, scores = self._model.predict(inputs)
+        return self.make_results(list_of_spans, scores)
+
+    def save(self, filepath):
+        with open(filepath, mode='wb') as fout:
+            pickle.dump(self._model, fout)
+
+    def load(self, filepath):
+        with open(filepath, mode='rb') as f:
+            self._model = pickle.load(f)
+
+
 class TextClassifier(ChoicesBaseModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(source_type='text', **kwargs)
+
+
+class TextTagger(LabelsBaseModel):
 
     def __init__(self, **kwargs):
         super().__init__(source_type='text', **kwargs)
