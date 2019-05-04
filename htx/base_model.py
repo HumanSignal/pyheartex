@@ -146,7 +146,7 @@ class LabelsBaseModel(BaseModel):
     def get_outputs(self, tasks):
         outputs = []
         for task in tasks:
-            path = []
+            spans = []
             for r in task['result']:
                 if r['from_name'] == self.tag_name and r['to_name'] == self.source_name:
                     labels = r['value'].get(self.tag_type)
@@ -158,31 +158,34 @@ class LabelsBaseModel(BaseModel):
                     if not start or not end:
                         logger.warning(f'Error while parsing {r}: '
                                        f'{self.tag_type} should contain "start" and "end" fields')
-
-                    path.append((label, start, end))
-            outputs.append(path)
+                    spans.append({
+                        'label': label,
+                        'start': start,
+                        'end': end
+                    })
+            outputs.append(spans)
         return outputs
 
-    def _iter_spans(self, path):
-        return (None, None, None)
-
-    def make_results(self, paths, scores):
-        results = []
-        for path, score in zip(paths, scores):
-            for tag, start, end in self._iter_spans(path):
+    def make_results(self, list_of_spans, scores):
+        list_results = []
+        for spans, score in zip(list_of_spans, scores):
+            results = []
+            for span in spans:
                 results.append({
                     'result': [{
                         'from_name': self.tag_name,
                         'to_name': self.source_name,
                         'value': {
-                            self.tag_type: [tag],
-                            'start': start,
-                            'end': end
+                            self.tag_type: [span['label']],
+                            'start': span['start'],
+                            'end': span['end'],
+                            'text': span['substr']
                         }
                     }],
                     'score': score
                 })
-        return results
+            list_results.append(results)
+        return list_results
 
     @abstractmethod
     def create_model(self):
@@ -197,8 +200,16 @@ class LabelsBaseModel(BaseModel):
 
     def predict(self, tasks):
         inputs = self.get_inputs(tasks)
-        paths, scores = self._model.predict(inputs)
-        return self.make_results(paths, scores)
+        list_of_spans, scores = self._model.predict(inputs)
+        return self.make_results(list_of_spans, scores)
+
+    def save(self, filepath):
+        with open(filepath, mode='wb') as fout:
+            pickle.dump(self._model, fout)
+
+    def load(self, filepath):
+        with open(filepath, mode='rb') as f:
+            self._model = pickle.load(f)
 
 
 class TextClassifier(ChoicesBaseModel):
