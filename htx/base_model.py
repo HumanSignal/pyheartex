@@ -167,25 +167,22 @@ class LabelsBaseModel(BaseModel):
         return outputs
 
     def make_results(self, list_of_spans, scores):
-        list_results = []
+        results = []
         for spans, score in zip(list_of_spans, scores):
-            results = []
+            result = []
             for span in spans:
-                results.append({
-                    'result': [{
-                        'from_name': self.tag_name,
-                        'to_name': self.source_name,
-                        'value': {
-                            self.tag_type: [span['label']],
-                            'start': span['start'],
-                            'end': span['end'],
-                            'text': span['substr']
-                        }
-                    }],
-                    'score': score
+                result.append({
+                    'from_name': self.tag_name,
+                    'to_name': self.source_name,
+                    'value': {
+                        self.tag_type: [span['label']],
+                        'start': span['start'],
+                        'end': span['end'],
+                        'text': span['substr']
+                    }
                 })
-            list_results.append(results)
-        return list_results
+            results.append({'result': result, 'score': score})
+        return results
 
     @abstractmethod
     def create_model(self):
