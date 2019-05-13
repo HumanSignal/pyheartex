@@ -3,36 +3,16 @@ import multiprocessing as mp
 import logging
 import json
 import attr
+import io
 
-from datetime import datetime
-from collections import defaultdict
+from operator import attrgetter
+from redis import Redis
+from rq import Queue
+from rq.registry import FinishedJobRegistry
+from rq.job import Job
 
 
 logger = logging.getLogger(__name__)
-
-
-@attr.s
-class ModelItem(object):
-    model = attr.ib()
-    version = attr.ib()
-    schema = attr.ib()
-
-    def reassign_schema(self):
-        # TODO: remove schema from model itself and use it in preprocessing step in ModelManager
-        new_tag_name = self.schema.get('tag_name')
-        if new_tag_name != self.model.tag_name:
-            logger.info(f'New tag name={new_tag_name}')
-            self.model.tag_name = new_tag_name
-
-        new_source_name = self.schema.get('source_name')
-        if new_source_name != self.model.source_name:
-            logger.info(f'New source name={new_source_name}')
-            self.model.source_name = new_source_name
-
-        new_source_value = self.schema.get('source_value')
-        if new_source_value != self.model.source_value:
-            logger.info(f'New source value={new_source_value}')
-            self.model.source_value = new_source_value
 
 
 class ModelManager(object):
@@ -41,137 +21,129 @@ class ModelManager(object):
     _DEFAULT_MODEL_VERSION = 'model'
     queue = mp.Queue()
 
-    def __init__(self, create_model_func, model_dir, min_examples_for_train=10, retrain_after_num_examples=10):
-        self.model_dir = model_dir
-        if not os.path.exists(self.model_dir):
-            os.makedirs(self.model_dir)
+    def __init__(
+        self,
+        create_model_func,
+        model_dir='~/.heartex/models',
+        data_dir='~/.heartex/data',
+        min_examples_for_train=1,
+        retrain_after_num_examples=1,
+        train_interval=60,
+        **train_kwargs
+    ):
+        self.model_dir = os.path.expanduser(model_dir)
+        self.data_dir = os.path.expanduser(data_dir)
         self.create_model_func = create_model_func
+        self.train_interval = train_interval
+        self.train_kwargs = train_kwargs
         self.min_examples_for_train = min_examples_for_train
         self.retrain_after_num_examples = retrain_after_num_examples
+
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
         self.model_list_file = os.path.join(self.model_dir, self._MODEL_LIST_FILE)
 
         self._current_model = {}
+        self._redis = Redis()
 
-    def get_model(self, project):
-        return self._current_model.get(project)
+    def _get_latest_finished_train_job(self, project):
+        redis = Redis()
+        queue = Queue(connection=redis)
+        registry = FinishedJobRegistry(queue.name, queue.connection)
+        if registry.count() == 0:
+            logger.info('Train job registry is empty.')
+            return None
+        jobs = []
+        for job_id in registry.get_job_ids():
+            job = Job.fetch(job_id, connection=redis)
+            if job.meta.get('project') != project:
+                continue
+            jobs.append(job)
+        jobs = sorted(jobs, key=attrgetter('ended_at'), reverse=True)
+        latest_job = jobs[0]
+        logger.info(f'Project {project}: latest train job found: {latest_job}')
+        return latest_job
 
-    def get_model_version(self, project):
-        curr_model = self._current_model.get(project)
-        return curr_model.version if curr_model else None
+    def setup(self, project, schema):
+        train_job = self._get_latest_finished_train_job(project)
+        if not train_job:
+            logger.info('No one training job has been finished yet.')
+            return None
 
-    def create_new_model(self):
-        model = self.create_model_func()
-        version = str(datetime.now())
-        return model, version
+        model = self.create_model_func(**schema)
+        loaded = model.load(train_job.result)
+        if not loaded:
+            logger.error('Model is not loaded.')
+            return None
+        self._current_model[project] = model
+        return train_job.ended_at
 
-    def _create_new_model(self, version, schema):
-        model = self.create_model_func()
-        if schema and not self._validate(model, schema):
-            error_msg = f'Current scheme {schema} is not valid for model {model}'
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-        model_item = ModelItem(
-            model=self.create_model_func(),
-            version=version,
-            schema=schema or {}
-        )
-        return model_item
-
-    def load_model(self, model_version, project, schema):
-        model_item = self.get_model(project)
-        if not model_item:
-            logger.info(f'Creating new model for project={project}, version={model_version}, schema={schema}')
-            self._current_model[project] = self._create_new_model(model_version, schema)
-        elif model_version != model_item.version:
-            logger.info(f'Creating new model for project={project}, version={model_version}, schema={schema}')
-            self._current_model[project] = self._create_new_model(model_version, schema)
-            model_file = os.path.join(self.model_dir, str(project), model_version)
-            logger.info(f'Loading model parameters from {model_file}')
-            self._current_model[project].model.load(model_file)
-
-    def save_model(self, model, model_version, project):
-        dirpath = os.path.join(self.model_dir, str(project))
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
-        output_model_file = os.path.join(dirpath, model_version)
-        model.save(output_model_file)
-        model_list_file = os.path.join(dirpath, self._MODEL_LIST_FILE)
-        with open(model_list_file, mode='a') as fout:
-            fout.write(model_version + '\n')
-        logger.info(f'Model successfully saved to {output_model_file}')
-
-    def setup(self, project, scheme=None):
-        model_list_file = os.path.join(self.model_dir, str(project), self._MODEL_LIST_FILE)
-        if not os.path.exists(model_list_file) or os.stat(model_list_file).st_size == 0:
-            logger.warning(f'{self.model_list_file} is doesn''t exist or empty')
-            if not self.get_model(project):
-                logger.info(f'Creating new empty model for project={project}')
-                self._current_model[project] = self._create_new_model(version=None, schema=scheme)
-        else:
-            logger.info(f'Reading "{model_list_file}"')
-            with open(model_list_file) as f:
-                model_list = f.read().splitlines()
-            requested_model_version = model_list[-1]
-            logger.info(f'Loading model version {requested_model_version}')
-            self.load_model(requested_model_version, project, schema=scheme)
-
-        # TODO: make this explicit in model manager
-        self.get_model(project).reassign_schema()
-
-    @classmethod
-    def _validate(cls, model, scheme):
-        return (
-            model.tag_type.lower() == scheme.get('tag_type', '').lower() and
-            model.source_type.lower() == scheme.get('source_type', '').lower()
-        )
-
-    def validate(self, scheme):
-        model = self.create_model_func()
-        return model and scheme and self._validate(model, scheme)
+    def validate(self, config):
+        return self.create_model_func().get_valid_schemas(config)
 
     def predict(self, request_data):
         project = request_data['project']
-        if self._current_model.get(project) is None:
-            raise ValueError('Model is not loaded')
+        if project not in self._current_model:
+            raise ValueError(f'Model is not loaded for project {project}')
 
-        current_model_version = self.get_model_version(project)
-        requested_model_version = request_data.get('model_version')
-        if current_model_version != requested_model_version:
-            raise ValueError(
-                f'Current model version "{current_model_version}" '
-                f'!= requested model version "{requested_model_version}" for project {project}'
-            )
-        # self.load_model(requested_model_version)
-        model_item = self.get_model(project)
-        results = model_item.model.predict(request_data['tasks'])
+        model = self._current_model[project]
+        data_items = []
+        for task in request_data['tasks']:
+            data_items.append(attr.asdict(model.get_data_item(task, for_train=False)))
+        results = model.predict(data_items)
 
-        return results, current_model_version
+        return results, model.version
 
-    def update(self, request_data):
-        project = request_data.pop('project')
-        curr_model = self.get_model(project)
-        schema = curr_model.schema if curr_model else {}
-        self.queue.put((request_data, project, schema))
+    def update(self, task, project, schema):
+        model = self.create_model_func(**schema)
+        data_item = model.get_data_item(task, for_train=True)
+        if not data_item.input:
+            logger.warning(f'Input is missing for {data_item}: skip using it.')
+        elif not data_item.output:
+            logger.warning(f'Output is missing for {data_item}: skip using it.')
+        else:
+            self.queue.put((project, attr.asdict(data_item)))
 
-    def train_loop(self, queue):
+    def _run_train_script(self, queue, train_script, project):
+        project_data_dir = os.path.join(self.data_dir, project)
+        project_model_dir = os.path.join(self.model_dir, project)
+        job = queue.enqueue(
+            train_script,
+            args=(project_data_dir, project_model_dir),
+            kwargs=self.train_kwargs,
+            ttl=-1,
+            result_ttl=-1,
+            failure_ttl=300,
+            meta={'project': project}
+        )
+        logger.info(f'Training job started: {job}')
+
+    def train_loop(self, data_queue, train_script):
         logger.info(f'Train loop starts, PID={os.getpid()}')
-        tasks = defaultdict(list)  # TODO: its not good idea to save tasks in memory
-        for request_data, project, schema in iter(queue.get, None):
-            tasks[project].append(request_data)
+        redis = Redis()
+        redis_queue = Queue(connection=redis)
+        for project, data in iter(data_queue.get, None):
+
+            # data block
             try:
-                train_tasks = tasks[project]
-                if len(train_tasks) % self.retrain_after_num_examples == 0 \
-                        and len(train_tasks) >= self.min_examples_for_train:
-                    model_version = str(datetime.now())
-                    model_item = self._create_new_model(model_version, schema)
-                    model_item.reassign_schema()
-                    logger.info(f'Start training model with {len(train_tasks)} tasks')
-                    fitted = model_item.model.fit(train_tasks)
-                    if fitted:
-                        self.save_model(model_item.model, model_version, project)
-                else:
-                    logger.info(f'Reaching {len(train_tasks)} examples, not time to train...')
-            except Exception as e:
-                logger.error(f'Training failed. Reason: {str(e)}', exc_info=True)
-                continue
-        logger.info('Exit train loop')
+                with io.open(os.path.join(self.data_dir, f'{project}.jsonl'), mode='a') as fout:
+                    item = {'input': data['input'], 'output': data['output']}
+                    if data['meta']:
+                        item['meta'] = data['meta']
+                    jsonl = json.dumps(item, ensure_ascii=False)
+                    fout.write(jsonl + '\n')
+            except Exception as error:
+                logger.error(f'Failed to store data: data_dir={self.data_dir}, project={project}, '
+                             f'data={data}. Reason: {error}')
+
+            # train block
+            try:
+                redis_key = f'project:{project}'  # TODO: may be using scopes?
+                redis.incr(redis_key)
+                total_items = redis.get(redis_key)
+                if total_items >= self.min_examples_for_train and total_items % self.retrain_after_num_examples == 0:
+                    self._run_train_script(redis_queue, train_script, project)
+            except Exception as error:
+                logger.error(f'Failed to start training job. Reason: {error}')
