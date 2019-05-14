@@ -59,11 +59,6 @@ class BaseModel(ABC):
         config = xmljson.badgerfish.data(xml)
         return config.get('View')
 
-    def set_current_schema(self, input_names, output_names, input_values):
-        self.input_names = input_names
-        self.output_names = output_names
-        self.input_values = input_values
-
     def get_valid_schemas(self, config_string):
 
         config = self._parse_config_to_json(config_string)
