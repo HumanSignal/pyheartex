@@ -52,7 +52,7 @@ class ModelManager(object):
         redis = Redis()
         queue = Queue(connection=redis)
         registry = FinishedJobRegistry(queue.name, queue.connection)
-        if registry.count() == 0:
+        if registry.count == 0:
             logger.info('Train job registry is empty.')
             return None
         jobs = []
@@ -106,12 +106,11 @@ class ModelManager(object):
         else:
             self.queue.put((project, attr.asdict(data_item)))
 
-    def _run_train_script(self, queue, train_script, project):
-        project_data_dir = os.path.join(self.data_dir, project)
+    def _run_train_script(self, queue, train_script, data_dir, project):
         project_model_dir = os.path.join(self.model_dir, project)
         job = queue.enqueue(
             train_script,
-            args=(project_data_dir, project_model_dir),
+            args=(data_dir, project_model_dir),  # TODO: only project id is needed to be passed
             kwargs=self.train_kwargs,
             ttl=-1,
             result_ttl=-1,
@@ -121,14 +120,18 @@ class ModelManager(object):
         logger.info(f'Training job started: {job}')
 
     def train_loop(self, data_queue, train_script):
-        logger.info(f'Train loop starts, PID={os.getpid()}')
         redis = Redis()
         redis_queue = Queue(connection=redis)
+        logger.info(f'Train loop starts: PID={os.getpid()}, Redis connection: {redis}, queue: {redis_queue}')
         for project, data in iter(data_queue.get, None):
 
             # data block
+            project_data_dir = None
             try:
-                with io.open(os.path.join(self.data_dir, f'{project}.jsonl'), mode='a') as fout:
+                project_data_dir = os.path.join(self.data_dir, project)
+                if not os.path.exists(project_data_dir):
+                    os.makedirs(project_data_dir)
+                with io.open(os.path.join(project_data_dir, 'data.jsonl'), mode='a') as fout:
                     item = {'input': data['input'], 'output': data['output']}
                     if data['meta']:
                         item['meta'] = data['meta']
@@ -136,14 +139,17 @@ class ModelManager(object):
                     fout.write(jsonl + '\n')
             except Exception as error:
                 logger.error(f'Failed to store data: data_dir={self.data_dir}, project={project}, '
-                             f'data={data}. Reason: {error}')
+                             f'data={data}. Reason: {error}', exc_info=True)
+
+            if not project_data_dir:
+                continue
 
             # train block
             try:
                 redis_key = f'project:{project}'  # TODO: may be using scopes?
                 redis.incr(redis_key)
-                total_items = redis.get(redis_key)
+                total_items = int(redis.get(redis_key))
                 if total_items >= self.min_examples_for_train and total_items % self.retrain_after_num_examples == 0:
-                    self._run_train_script(redis_queue, train_script, project)
+                    self._run_train_script(redis_queue, train_script, project_data_dir, project)
             except Exception as error:
-                logger.error(f'Failed to start training job. Reason: {error}')
+                logger.error(f'Failed to start training job. Reason: {error}', exc_info=True)
