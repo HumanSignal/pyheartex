@@ -22,12 +22,8 @@ def init_model_server(train_scipt, **kwargs):
 @_server.route('/predict', methods=['POST'])
 def _predict():
     data = json.loads(request.data)
-    results, model_version = _model_manager.predict(data)
-    response = {
-        'results': results,
-        'model_version': model_version
-    }
-    return jsonify(response)
+    results = _model_manager.predict(data)
+    return jsonify(results)
 
 
 @_server.route('/update', methods=['POST'])

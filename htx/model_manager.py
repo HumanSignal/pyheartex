@@ -61,6 +61,9 @@ class ModelManager(object):
             if job.meta.get('project') != project:
                 continue
             jobs.append(job)
+        if not jobs:
+            logger.info(f'No jobs found for project {project}')
+            return None
         jobs = sorted(jobs, key=attrgetter('ended_at'), reverse=True)
         latest_job = jobs[0]
         logger.info(f'Project {project}: latest train job found: {latest_job}')
@@ -73,15 +76,15 @@ class ModelManager(object):
             return None
 
         model = self.create_model_func(**schema)
-        loaded = model.load(train_job.result)
-        if not loaded:
+        model_version = model.load(train_job.result)
+        if model_version is None:
             logger.error('Model is not loaded.')
             return None
         self._current_model[project] = model
-        return train_job.ended_at
+        return model_version
 
     def validate(self, config):
-        return self.create_model_func().get_valid_schemas(config)
+        return self.create_model_func.get_valid_schemas(config)
 
     def predict(self, request_data):
         project = request_data['project']
@@ -94,7 +97,7 @@ class ModelManager(object):
             data_items.append(attr.asdict(model.get_data_item(task, for_train=False)))
         results = model.predict(data_items)
 
-        return results, model.version
+        return results
 
     def update(self, task, project, schema):
         model = self.create_model_func(**schema)

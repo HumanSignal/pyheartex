@@ -51,6 +51,7 @@ class BaseModel(ABC):
     def get_output(self, task):
         pass
 
+    @classmethod
     def _parse_config_to_json(cls, config_string):
         parser = etree.XMLParser(recover=False)
         xml = etree.fromstring(config_string, parser)
@@ -59,20 +60,21 @@ class BaseModel(ABC):
         config = xmljson.badgerfish.data(xml)
         return config.get('View')
 
-    def get_valid_schemas(self, config_string):
+    @classmethod
+    def get_valid_schemas(cls, config_string):
 
-        config = self._parse_config_to_json(config_string)
+        config = cls._parse_config_to_json(config_string)
         if not config:
             logger.warning(f'Cannot parse config string {config_string}.')
             return []
 
-        if not (all(i in config for i in self.INPUT_TYPES) and all(o in config for o in self.OUTPUT_TYPES)):
-            logger.info(f'{self.__class__.__name__} has no valid schemas for config {config}')
+        if not (all(i in config for i in cls.INPUT_TYPES) and all(o in config for o in cls.OUTPUT_TYPES)):
+            logger.info(f'{cls.__class__.__name__} has no valid schemas for config {config}')
             return []
 
         valid_inputs = []
         valid_input_names_found = set()
-        for input_type in self.INPUT_TYPES:
+        for input_type in cls.INPUT_TYPES:
             valid_inputs_of_type = []
             tagvalue = config[input_type]
             if isinstance(tagvalue, list):
@@ -89,12 +91,12 @@ class BaseModel(ABC):
         def _output_tag_is_applicable(tagvalue):
             # TODO: not sure this is correct way to check input->output bindings
             toNames = tagvalue['@toName'].split('+')
-            if set(toNames).issubset(valid_input_names_found) and len(toNames) == len(self.INPUT_TYPES):
+            if set(toNames).issubset(valid_input_names_found) and len(toNames) == len(cls.INPUT_TYPES):
                 return True
             return False
 
         valid_outputs = []
-        for output_type in self.OUTPUT_TYPES:
+        for output_type in cls.OUTPUT_TYPES:
             valid_outputs_of_type = []
             tagvalue = config[output_type]
             if isinstance(tagvalue, list):
@@ -116,7 +118,7 @@ class BaseModel(ABC):
                     'output_names': list(map(itemgetter('name'), valid_outputs_prod)),
                     'input_values': list(map(itemgetter('value'), valid_inputs_prod))
                 }
-                logger.debug(f'{self.__class__.__name__} founds valid schema={schema} for config={config}')
+                logger.debug(f'{cls.__class__.__name__} founds valid schema={schema} for config={config}')
                 schemas.append(schema)
 
         return schemas
@@ -143,7 +145,7 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def load(self, root_model_dir, version):
+    def load(self, serialized_train_output):
         pass
 
     def __repr__(self):
@@ -236,14 +238,6 @@ class SingleLabelsBaseModel(BaseModel):
         inputs = self.get_inputs(tasks)
         list_of_spans, scores = self._model.predict(inputs)
         return self.make_results(list_of_spans, scores)
-
-    def save(self, filepath):
-        with open(filepath, mode='wb') as fout:
-            pickle.dump(self._model, fout)
-
-    def load(self, filepath):
-        with open(filepath, mode='rb') as f:
-            self._model = pickle.load(f)
 
 
 class BoundingBoxBaseModel(BaseModel):
