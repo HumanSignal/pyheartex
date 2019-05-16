@@ -1,5 +1,4 @@
 import logging
-import pickle
 import json
 import attr
 import xmljson
@@ -165,7 +164,6 @@ class SingleChoiceBaseModel(BaseModel):
             if r['from_name'] == output_name and r['to_name'] == input_name:
                 single_choice = r['value'].get('choices')
                 if isinstance(single_choice, list):
-                    single_choice = single_choice[0]
                     break
 
         if not single_choice:
@@ -182,6 +180,7 @@ class SingleChoiceBaseModel(BaseModel):
                 'result': [{
                     'from_name': output_name,
                     'to_name': input_name,
+                    # TODO: make support for multilabel output
                     'value': {'choices': [label]}
                 }],
                 'score': score
