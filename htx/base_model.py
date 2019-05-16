@@ -233,11 +233,6 @@ class SingleLabelsBaseModel(BaseModel):
             results.append({'result': result, 'score': score})
         return results
 
-    def predict(self, tasks):
-        inputs = self.get_inputs(tasks)
-        list_of_spans, scores = self._model.predict(inputs)
-        return self.make_results(list_of_spans, scores)
-
 
 class BoundingBoxBaseModel(BaseModel):
     OUTPUT_TYPES = (LABELS_TYPE, BOUNDING_BOX_TYPE)
