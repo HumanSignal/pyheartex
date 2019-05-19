@@ -155,7 +155,7 @@ class LabelsBaseModel(BaseModel):
                         continue
                     label = labels[0]
                     start, end = r['value'].get('start'), r['value'].get('end')
-                    if not start or not end:
+                    if start is None or end is None:
                         logger.warning(f'Error while parsing {r}: '
                                        f'{self.tag_type} should contain "start" and "end" fields')
                     spans.append({
