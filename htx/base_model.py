@@ -254,6 +254,27 @@ class BoundingBoxBaseModel(BaseModel):
             })
         return output
 
+    def make_result(self, list_of_bboxes, scores):
+        results = []
+        input_name = self.input_names[0] if self.input_names else None
+        output_name = self.output_names[0] if self.output_names else None
+        for bboxes, score in zip(list_of_bboxes, scores):
+            result = []
+            for bbox in bboxes:
+                result.append({
+                    'from_name': output_name,
+                    'to_name': input_name,
+                    'value': {
+                        'labels': [bbox['label']],
+                        'x': bbox['x'],
+                        'y': bbox['y'],
+                        'height': bbox['height'],
+                        'width': bbox['width']
+                    }
+                })
+            results.append({'result': result, 'score': score})
+        return results
+
 
 class SingleClassTextClassifier(SingleChoiceBaseModel):
     INPUT_TYPES = (TEXT_TYPE,)
