@@ -12,6 +12,8 @@ setup(
     install_requires=[
         'Flask==1.0.2',
         'attrs==19.1.0',
+        'xmljson==0.2.0',
+        'lxml==4.3.3',
         'rq==1.0'
     ],
 )
