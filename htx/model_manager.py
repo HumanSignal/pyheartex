@@ -20,11 +20,13 @@ class QueuedItem(object):
     def __init__(self, project):
         self.project = project
 
+
 class QueuedDataItem(QueuedItem):
 
     def __init__(self, data_item, project):
         super(QueuedDataItem, self).__init__(project)
         self.data_item = attr.asdict(data_item)
+
 
 class QueuedDataItems(QueuedItem):
 
@@ -32,8 +34,10 @@ class QueuedDataItems(QueuedItem):
         super(QueuedDataItems, self).__init__(project)
         self.data_items = [attr.asdict(data_item) for data_item in data_items]
 
+
 class QueuedWaitSignal(QueuedItem):
     pass
+
 
 class QueuedTrainSignal(QueuedItem):
     pass
