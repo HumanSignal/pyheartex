@@ -15,6 +15,30 @@ from rq.job import Job
 logger = logging.getLogger(__name__)
 
 
+class QueuedItem(object):
+
+    def __init__(self, project):
+        self.project = project
+
+class QueuedDataItem(QueuedItem):
+
+    def __init__(self, data_item, project):
+        super(QueuedDataItem, self).__init__(project)
+        self.data_item = attr.asdict(data_item)
+
+class QueuedDataItems(QueuedItem):
+
+    def __init__(self, data_items, project):
+        super(QueuedDataItems, self).__init__(project)
+        self.data_items = [attr.asdict(data_item) for data_item in data_items]
+
+class QueuedWaitSignal(QueuedItem):
+    pass
+
+class QueuedTrainSignal(QueuedItem):
+    pass
+
+
 class ModelManager(object):
 
     _MODEL_LIST_FILE = 'model_list.txt'
@@ -107,7 +131,28 @@ class ModelManager(object):
         elif not data_item.output:
             logger.warning(f'Output is missing for {data_item}: skip using it.')
         else:
-            self.queue.put((project, attr.asdict(data_item)))
+            queued_items = [
+                QueuedDataItem(data_item, project),
+                QueuedTrainSignal(project)
+            ]
+            self.queue.put((project, queued_items))
+
+    def update_many(self, tasks, project, schema):
+        model = self.create_model_func(**schema)
+        data_items = []
+        for task in tasks:
+            data_item = model.get_data_item(task, for_train=True)
+            if not data_item.input:
+                logger.warning(f'Input is missing for {data_item}: skip using it.')
+            elif not data_item.output:
+                logger.warning(f'Output is missing for {data_item}: skip using it.')
+            else:
+                data_items.append(data_item)
+        queued_items = [
+            QueuedDataItems(data_items, project),
+            QueuedTrainSignal(project)
+        ]
+        self.queue.put((queued_items,))
 
     def _run_train_script(self, queue, train_script, data_dir, project):
         project_model_dir = os.path.join(self.model_dir, project)
@@ -122,37 +167,61 @@ class ModelManager(object):
         )
         logger.info(f'Training job started: {job}')
 
+    @staticmethod
+    def _try_save_data(data_items, project_data_dir):
+        output_file = None
+        try:
+            output_file = os.path.join(project_data_dir, 'data.jsonl')
+            with io.open(output_file, mode='a') as fout:
+                for data_item in data_items:
+                    item = {'input': data_item['input'], 'output': data_item['output']}
+                    if data_item['meta']:
+                        item['meta'] = data_item['meta']
+                    jsonl = json.dumps(item, ensure_ascii=False)
+                    fout.write(jsonl + '\n')
+        except Exception:
+            logger.error(f'Failed to store data to {output_file}', exc_info=True)
+            return False
+
+        return True
+
     def train_loop(self, data_queue, train_script):
         redis = Redis()
         redis_queue = Queue(connection=redis)
         logger.info(f'Train loop starts: PID={os.getpid()}, Redis connection: {redis}, queue: {redis_queue}')
-        for project, data in iter(data_queue.get, None):
+        for queued_items, in iter(data_queue.get, None):
+            for queued_item in queued_items:
+                project = queued_item.project
 
-            # data block
-            project_data_dir = None
-            try:
+                # ensure project dir exists
                 project_data_dir = os.path.join(self.data_dir, project)
                 if not os.path.exists(project_data_dir):
                     os.makedirs(project_data_dir)
-                with io.open(os.path.join(project_data_dir, 'data.jsonl'), mode='a') as fout:
-                    item = {'input': data['input'], 'output': data['output']}
-                    if data['meta']:
-                        item['meta'] = data['meta']
-                    jsonl = json.dumps(item, ensure_ascii=False)
-                    fout.write(jsonl + '\n')
-            except Exception as error:
-                logger.error(f'Failed to store data: data_dir={self.data_dir}, project={project}, '
-                             f'data={data}. Reason: {error}', exc_info=True)
 
-            if not project_data_dir:
-                continue
+                # one data item -> store it
+                if isinstance(queued_item, QueuedDataItem):
+                    if not self._try_save_data([queued_item.data_item], project_data_dir):
+                        continue
 
-            # train block
-            try:
-                redis_key = f'project:{project}'  # TODO: may be using scopes?
-                redis.incr(redis_key)
-                total_items = int(redis.get(redis_key))
-                if total_items >= self.min_examples_for_train and total_items % self.retrain_after_num_examples == 0:
-                    self._run_train_script(redis_queue, train_script, project_data_dir, project)
-            except Exception as error:
-                logger.error(f'Failed to start training job. Reason: {error}', exc_info=True)
+                # many data items -> store them
+                elif isinstance(queued_item, QueuedDataItems):
+                    if not self._try_save_data(map(attrgetter('data_item'), queued_item.data_items), project_data_dir):
+                        continue
+
+                # train signal -> launch training if conditions are met
+                elif isinstance(queued_item, QueuedTrainSignal):
+                    try:
+                        redis_key = f'project:{project}'  # TODO: may be using scopes?
+                        redis.incr(redis_key)
+                        total_items = int(redis.get(redis_key))
+                        if total_items >= self.min_examples_for_train and total_items % self.retrain_after_num_examples == 0:
+                            self._run_train_script(redis_queue, train_script, project_data_dir, project)
+                    except Exception as error:
+                        logger.error(f'Failed to start training job. Reason: {error}', exc_info=True)
+
+                # wait signal -> do nothing
+                elif isinstance(queued_item, QueuedWaitSignal):
+                    pass
+
+                else:
+                    logger.warning(f'Unknown queued item type {queued_item.__class__.__name__}')
