@@ -11,6 +11,7 @@ setup(
     include_package_data=True,
     install_requires=[
         'Flask==1.0.2',
-        'attrs==19.1.0'
+        'attrs==19.1.0',
+        'rq==1.0'
     ],
 )
