@@ -135,7 +135,7 @@ class ModelManager(object):
                 QueuedDataItem(data_item, project),
                 QueuedTrainSignal(project)
             ]
-            self.queue.put((project, queued_items))
+            self.queue.put((queued_items,))
 
     def update_many(self, tasks, project, schema):
         model = self.create_model_func(**schema)
