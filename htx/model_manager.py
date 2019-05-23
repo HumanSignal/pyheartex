@@ -122,8 +122,8 @@ class ModelManager(object):
         )
         logger.info(f'Training job started: {job}')
 
-    def train_loop(self, data_queue, train_script, queue_name):
-        redis = Redis()
+    def train_loop(self, data_queue, train_script, queue_name, redis_host, redis_port):
+        redis = Redis(host=redis_host, port=redis_port)
         redis_queue = Queue(name=queue_name, connection=redis)
         logger.info(f'Train loop starts: PID={os.getpid()}, Redis connection: {redis}, queue: {redis_queue}')
         for project, data in iter(data_queue.get, None):
