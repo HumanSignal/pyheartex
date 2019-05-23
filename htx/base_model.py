@@ -68,6 +68,7 @@ class BaseModel(ABC):
             return []
 
         if not (all(i in config for i in cls.INPUT_TYPES) and all(o in config for o in cls.OUTPUT_TYPES)):
+            # TODO: enhance log: currently is "INFO:htx.base_model:ABCMeta has no valid schemas..."
             logger.info(f'{cls.__class__.__name__} has no valid schemas for config {config}')
             return []
 
