@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 _model_manager = None
 
 
-def init_model_server(train_scipt, **kwargs):
+def init_model_server(train_script, **kwargs):
     global _model_manager
     _model_manager = ModelManager(**kwargs)
-    train_process = mp.Process(target=_model_manager.train_loop, args=(_model_manager.queue, train_scipt))
+    train_process = mp.Process(target=_model_manager.train_loop, args=(_model_manager.queue, train_script))
     train_process.start()
 
 
