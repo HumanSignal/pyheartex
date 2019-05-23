@@ -12,13 +12,10 @@ logger = logging.getLogger(__name__)
 _model_manager = None
 
 
-def init_model_server(train_scipt, queue_name='default', redis_host='localhost', redis_port=6379, **kwargs):
+def init_model_server(train_scipt, **kwargs):
     global _model_manager
     _model_manager = ModelManager(**kwargs)
-    train_process = mp.Process(
-        target=_model_manager.train_loop,
-        args=(_model_manager.queue, train_scipt, queue_name, redis_host, redis_port)
-    )
+    train_process = mp.Process(target=_model_manager.train_loop, args=(_model_manager.queue, train_scipt))
     train_process.start()
 
 
