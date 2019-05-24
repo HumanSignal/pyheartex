@@ -57,6 +57,9 @@ class ModelManager(object):
         min_examples_for_train=1,
         retrain_after_num_examples=1,
         train_interval=60,
+        redis_host='localhost',
+        redis_port=6379,
+        redis_queue='default',
         **train_kwargs
     ):
         self.model_dir = os.path.expanduser(model_dir)
@@ -66,6 +69,9 @@ class ModelManager(object):
         self.train_kwargs = train_kwargs
         self.min_examples_for_train = min_examples_for_train
         self.retrain_after_num_examples = retrain_after_num_examples
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.redis_queue = redis_queue
 
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
@@ -74,18 +80,17 @@ class ModelManager(object):
         self.model_list_file = os.path.join(self.model_dir, self._MODEL_LIST_FILE)
 
         self._current_model = {}
-        self._redis = Redis()
+        self._redis = Redis(host=redis_host, port=redis_port)
 
     def _get_latest_finished_train_job(self, project):
-        redis = Redis()
-        queue = Queue(connection=redis)
+        queue = Queue(name=self.redis_queue, connection=self._redis)
         registry = FinishedJobRegistry(queue.name, queue.connection)
         if registry.count == 0:
             logger.info('Train job registry is empty.')
             return None
         jobs = []
         for job_id in registry.get_job_ids():
-            job = Job.fetch(job_id, connection=redis)
+            job = Job.fetch(job_id, connection=self._redis)
             if job.meta.get('project') != project:
                 continue
             jobs.append(job)
@@ -190,8 +195,8 @@ class ModelManager(object):
         return True
 
     def train_loop(self, data_queue, train_script):
-        redis = Redis()
-        redis_queue = Queue(connection=redis)
+        redis = Redis(host=self.redis_host, port=self.redis_port)
+        redis_queue = Queue(name=self.redis_queue, connection=redis)
         logger.info(f'Train loop starts: PID={os.getpid()}, Redis connection: {redis}, queue: {redis_queue}')
         for queued_items, in iter(data_queue.get, None):
             for queued_item in queued_items:
