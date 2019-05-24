@@ -35,6 +35,18 @@ def _update():
     return jsonify({'status': 'ok'})
 
 
+@_server.route('/train', methods=['POST'])
+def _train():
+    data = json.loads(request.data)
+    tasks = data['tasks']
+    project = data['project']
+    schema = data['schema']
+    if len(tasks) == 0:
+        return jsonify({'status': 'error', 'message': 'No tasks found.'}), 400
+    _model_manager.update_many(tasks, project, schema)
+    return jsonify({'status': 'ok'})
+
+
 @_server.route('/setup', methods=['POST'])
 def _setup():
     data = json.loads(request.data)
