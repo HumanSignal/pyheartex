@@ -4,11 +4,12 @@ import logging
 import json
 import attr
 import io
+import shutil
 
 from operator import attrgetter
 from redis import Redis
 from rq import Queue
-from rq.registry import FinishedJobRegistry
+from rq.registry import StartedJobRegistry, FinishedJobRegistry
 from rq.job import Job
 
 
@@ -40,6 +41,10 @@ class QueuedWaitSignal(QueuedItem):
 
 
 class QueuedTrainSignal(QueuedItem):
+    pass
+
+
+class QueuedFlushAllSignal(QueuedItem):
     pass
 
 
@@ -158,6 +163,7 @@ class ModelManager(object):
             else:
                 data_items.append(data_item)
         queued_items = [
+            QueuedFlushAllSignal(project),
             QueuedDataItems(data_items, project),
             QueuedTrainSignal(project)
         ]
@@ -177,6 +183,18 @@ class ModelManager(object):
         logger.info(f'Training job started: {job}')
 
     @staticmethod
+    def _update_counters(redis, project):
+        redis_key = f'project:{project}'  # TODO: may be using scopes?
+        redis.incr(redis_key)
+        total_items = int(redis.get(redis_key))
+        return total_items
+
+    @staticmethod
+    def _delete_counters(redis, project):
+        redis_key = f'project:{project}'
+        redis.delete(redis_key)
+
+    @staticmethod
     def _try_save_data(data_items, project_data_dir):
         output_file = None
         try:
@@ -191,8 +209,30 @@ class ModelManager(object):
         except Exception:
             logger.error(f'Failed to store data to {output_file}', exc_info=True)
             return False
-
+        logger.info(f'{len(data_items)} data item(s) successfully saved to {output_file}')
         return True
+
+    def _flush_all(self, project, redis, reqis_queue):
+
+        # Cancel all running & finished jobs for specified project
+        started_registry = StartedJobRegistry(reqis_queue.name, reqis_queue.connection)
+        finished_registry = FinishedJobRegistry(reqis_queue.name, reqis_queue.connection)
+        for job_id in started_registry.get_job_ids() + finished_registry.get_job_ids():
+            job = Job.fetch(job_id, connection=self._redis)
+            if job.meta.get('project') != project:
+                continue
+            logger.info(f'Deleting job_id {job_id}')
+            job.delete()
+
+        # Delete project keys from Redis
+        self._delete_counters(redis, project)
+
+        # Remove project data dir
+        project_data_dir = os.path.join(self.data_dir, project)
+        if os.path.exists(project_data_dir):
+            logger.info(f'Remove {project_data_dir}')
+            # TODO: do we need the locks here?
+            shutil.rmtree(project_data_dir)
 
     def train_loop(self, data_queue, train_script):
         redis = Redis(host=self.redis_host, port=self.redis_port)
@@ -214,15 +254,13 @@ class ModelManager(object):
 
                 # many data items -> store them
                 elif isinstance(queued_item, QueuedDataItems):
-                    if not self._try_save_data(map(attrgetter('data_item'), queued_item.data_items), project_data_dir):
+                    if not self._try_save_data(queued_item.data_items, project_data_dir):
                         continue
 
                 # train signal -> launch training if conditions are met
                 elif isinstance(queued_item, QueuedTrainSignal):
                     try:
-                        redis_key = f'project:{project}'  # TODO: may be using scopes?
-                        redis.incr(redis_key)
-                        total_items = int(redis.get(redis_key))
+                        total_items = self._update_counters(redis, project)
                         if total_items >= self.min_examples_for_train and total_items % self.retrain_after_num_examples == 0:
                             self._run_train_script(redis_queue, train_script, project_data_dir, project)
                     except Exception as error:
@@ -231,6 +269,10 @@ class ModelManager(object):
                 # wait signal -> do nothing
                 elif isinstance(queued_item, QueuedWaitSignal):
                     pass
+
+                # flush all signal -> completely remove data & models related to specified project
+                elif isinstance(queued_item, QueuedFlushAllSignal):
+                    self._flush_all(queued_item.project, redis, redis_queue)
 
                 else:
                     logger.warning(f'Unknown queued item type {queued_item.__class__.__name__}')
