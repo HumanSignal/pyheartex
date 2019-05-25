@@ -19,6 +19,7 @@ IMAGE_TYPE = 'Image'
 CHOICES_TYPE = 'Choices'
 LABELS_TYPE = 'Labels'
 BOUNDING_BOX_TYPE = 'AddRectangleButton'
+LIST_TYPE = 'List'
 
 
 @attr.s
@@ -274,6 +275,42 @@ class BoundingBoxBaseModel(BaseModel):
                     }
                 })
             results.append({'result': result, 'score': score})
+        return results
+
+
+class ListBaseModel(BaseModel):
+    OUTPUT_TYPES = (LIST_TYPE,)
+
+    def get_output(self, task):
+        input_name = self.input_names[0]
+        output_name = self.output_names[0]
+        for r in task['result']:
+            if r['from_name'] != output_name or r['to_name'] != input_name:
+                continue
+            value = r['value']
+            return {
+                'selected': value['selected'],
+                'weights': value['weights'],
+                'items': value.get('items')
+            }
+        logger.warning(f'Can\'t get output for {self.__class__.__name__} from {task}')
+
+    def make_result(self, list_scores, items=None):
+        results = []
+        input_name = self.input_names[0] if self.input_names else None
+        output_name = self.output_names[0] if self.output_names else None
+        for scores in list_scores:
+            results.append({
+                'result': [{
+                    'from_name': input_name,
+                    'to_name': output_name,
+                    'value': {
+                        'weights': scores,
+                        'selected': [0] * len(scores),
+                        'items': items
+                    }
+                }]
+            })
         return results
 
 

@@ -58,6 +58,7 @@ def _setup():
 
 @_server.route('/validate', methods=['POST'])
 def _validate():
+    logger.info(f'Validating request: {request.data}')
     data = json.loads(request.data)
     config = data['config']
     validated_schemas = _model_manager.validate(config)
