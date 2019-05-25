@@ -295,11 +295,11 @@ class ListBaseModel(BaseModel):
             }
         logger.warning(f'Can\'t get output for {self.__class__.__name__} from {task}')
 
-    def make_result(self, list_scores, items=None):
+    def make_result(self, list_scores, list_items):
         results = []
         input_name = self.input_names[0] if self.input_names else None
         output_name = self.output_names[0] if self.output_names else None
-        for scores in list_scores:
+        for scores, items in zip(list_scores, list_items):
             results.append({
                 'result': [{
                     'from_name': input_name,
