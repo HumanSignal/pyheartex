@@ -116,24 +116,25 @@ class ModelManager(object):
     def setup(self, project, schema):
         train_job = self._get_latest_finished_train_job(project)
         if train_job:
-            result = train_job.result
+            resources = train_job.result
         else:
             # in case when jobs are broken, try to stash pop train resources from cache
-            result = self._try_stashpop_resources(project)
+            resources = self._try_stashpop_resources(project)
 
-        if not result:
+        if not resources:
             logger.info('Couldn\'t load train resources neither from latest jobs, nor from cache. Model is not loaded, '
                         'and consequent API calls (e.g. predict) will fail. This normally happens if your model '
                         'training is not started at very beginning. Otherwise it is a bug.')
             return None
 
         model = self.create_model_func(**schema)
-        model_version = model.load(result)
+        model_version = model.load(resources)
         if model_version is None:
-            logger.error(f'Found resources {result}, but model is not loaded. Consequent API calls (e.g. predict)'
+            logger.error(f'Found resources {resources}, but model is not loaded. Consequent API calls (e.g. predict)'
                          f' will fail.')
             return None
         self._current_model[project] = model
+        self._stash_resources(project, resources)
         logger.info(f'Model {model_version} successfully loaded for project {project}.')
         return model_version
 
