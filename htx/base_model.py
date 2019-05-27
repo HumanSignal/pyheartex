@@ -290,7 +290,7 @@ class ListBaseModel(BaseModel):
             value = r['value']
             return {
                 'selected': value['selected'],
-                'weights': value['weights'],
+                'weights': value.get('weights'),
                 'items': value.get('items')
             }
         logger.warning(f'Can\'t get output for {self.__class__.__name__} from {task}')
