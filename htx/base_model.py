@@ -19,7 +19,7 @@ IMAGE_TYPE = 'Image'
 CHOICES_TYPE = 'Choices'
 LABELS_TYPE = 'Labels'
 BOUNDING_BOX_TYPE = 'AddRectangleButton'
-LIST_TYPE = 'List'
+LIST_TYPE = 'Ranker'
 
 
 @attr.s
@@ -302,8 +302,8 @@ class ListBaseModel(BaseModel):
         for scores, items in zip(list_scores, list_items):
             results.append({
                 'result': [{
-                    'from_name': input_name,
-                    'to_name': output_name,
+                    'from_name': output_name,
+                    'to_name': input_name,
                     'value': {
                         'weights': scores,
                         'selected': [0] * len(scores),

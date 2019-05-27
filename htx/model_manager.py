@@ -151,11 +151,11 @@ class ModelManager(object):
             ]
             self.queue.put((queued_items,))
 
-    def update_many(self, tasks, project, schema):
+    def update_many(self, tasks, project, schema, for_train=True):
         model = self.create_model_func(**schema)
         data_items = []
         for task in tasks:
-            data_item = model.get_data_item(task, for_train=True)
+            data_item = model.get_data_item(task, for_train=for_train)
             if not data_item.input:
                 logger.warning(f'Input is missing for {data_item}: skip using it.')
             elif not data_item.output:
@@ -167,6 +167,25 @@ class ModelManager(object):
             QueuedDataItems(data_items, project),
             QueuedTrainSignal(project)
         ]
+
+        self.queue.put((queued_items,))
+
+    def upload_many(self, tasks, project, schema, start_training=True):
+        model = self.create_model_func(**schema)
+        data_items = []
+        for task in tasks:
+            data_item = model.get_data_item(task, for_train=False)
+            if not data_item.input:
+                logger.warning(f'Input is missing for {data_item}: skip using it.')
+            else:
+                data_items.append(data_item)
+        queued_items = [
+            QueuedFlushAllSignal(project),
+            QueuedDataItems(data_items, project)
+        ]
+        if start_training:
+            queued_items.append(QueuedTrainSignal(project))
+
         self.queue.put((queued_items,))
 
     def _run_train_script(self, queue, train_script, data_dir, project):
@@ -249,13 +268,11 @@ class ModelManager(object):
 
                 # one data item -> store it
                 if isinstance(queued_item, QueuedDataItem):
-                    if not self._try_save_data([queued_item.data_item], project_data_dir):
-                        continue
+                    self._try_save_data([queued_item.data_item], project_data_dir)
 
                 # many data items -> store them
                 elif isinstance(queued_item, QueuedDataItems):
-                    if not self._try_save_data(queued_item.data_items, project_data_dir):
-                        continue
+                    self._try_save_data(queued_item.data_items, project_data_dir)
 
                 # train signal -> launch training if conditions are met
                 elif isinstance(queued_item, QueuedTrainSignal):

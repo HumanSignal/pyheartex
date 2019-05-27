@@ -35,6 +35,16 @@ def _update():
     return jsonify({'status': 'ok'})
 
 
+@_server.route('/upload', methods=['POST'])
+def _upload():
+    data = json.loads(request.data)
+    tasks = data['tasks']
+    project = data['project']
+    schema = data['schema']
+    _model_manager.upload_many(tasks, project, schema)
+    return jsonify({'status': 'ok'})
+
+
 @_server.route('/train', methods=['POST'])
 def _train():
     data = json.loads(request.data)
