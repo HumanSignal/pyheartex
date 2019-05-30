@@ -139,12 +139,17 @@ class ModelManager(object):
         return model_version
 
     def validate(self, config):
-        return self.create_model_func.get_valid_schemas(config)
+        return self.create_model_func().get_valid_schemas(config)
 
     def predict(self, request_data):
         project = request_data['project']
         if project not in self._current_model:
-            raise ValueError(f'Model is not loaded for project {project}')
+            # try to initialize model
+            model_version = self.setup(project, request_data['schema'])
+            if model_version is not None:
+                logger.info(f'Model {model_version} is initialized for project {project} in lazy mode.')
+            else:
+                raise ValueError(f'Model is not loaded for project {project}')
 
         model = self._current_model[project]
         data_items = []

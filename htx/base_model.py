@@ -178,12 +178,17 @@ class SingleChoiceBaseModel(BaseModel):
         input_name = self.input_names[0]
         output_name = self.output_names[0]
         for label, score in zip(labels, scores):
+            if isinstance(label, str):
+                choices = [label]
+            elif isinstance(label, (list, tuple)):
+                choices = label
+            else:
+                raise ValueError(f'Unexpected label type {type(label)}: list, tuple or str expected')
             results.append({
                 'result': [{
                     'from_name': output_name,
                     'to_name': input_name,
-                    # TODO: make support for multilabel output
-                    'value': {'choices': [label]}
+                    'value': {'choices': choices}
                 }],
                 'score': score
             })
