@@ -122,9 +122,9 @@ class ModelManager(object):
             resources = self._try_stashpop_resources(project)
 
         if not resources:
-            logger.info('Couldn\'t load train resources neither from latest jobs, nor from cache. Model is not loaded, '
-                        'and consequent API calls (e.g. predict) will fail. This normally happens if your model '
-                        'training is not started at very beginning. Otherwise it is a bug.')
+            logger.info(f'Couldn\'t load train resources for project {project} neither from latest jobs, nor from cache.'
+                        f' Model is not loaded, and consequent API calls (e.g. predict) will fail. This normally happens'
+                        f' if your model training is not started at very beginning. Otherwise it is a bug.')
             return None
 
         model = self.create_model_func(**schema)
