@@ -221,6 +221,7 @@ class ModelManager(object):
             train_script,
             args=(data_dir, project_model_dir),  # TODO: only project id is needed to be passed
             kwargs=self.train_kwargs,
+            job_timeout='24h',
             ttl=-1,
             result_ttl=-1,
             failure_ttl=300,
