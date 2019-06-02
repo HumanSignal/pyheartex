@@ -114,7 +114,6 @@ class ModelManager(object):
         return self._redis.get(f'project:{project}:res')
 
     def setup(self, project, schema):
-        model = self.create_model_func(**schema)
         train_job = self._get_latest_finished_train_job(project)
         if train_job:
             resources = train_job.result
@@ -129,6 +128,7 @@ class ModelManager(object):
             return None
 
         try:
+            model = self.create_model_func(**schema)
             model_version = model.load(resources)
         except Exception as exc:
             logger.error(f'Couldn\'t load model for project {project} from resources {resources}', exc_info=True)
