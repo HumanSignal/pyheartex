@@ -57,11 +57,11 @@ class ModelManager(object):
     def __init__(
         self,
         create_model_func,
+        train_script,
         model_dir='~/.heartex/models',
         data_dir='~/.heartex/data',
         min_examples_for_train=1,
         retrain_after_num_examples=1,
-        train_interval=60,
         redis_host='localhost',
         redis_port=6379,
         redis_queue='default',
@@ -70,7 +70,7 @@ class ModelManager(object):
         self.model_dir = os.path.expanduser(model_dir)
         self.data_dir = os.path.expanduser(data_dir)
         self.create_model_func = create_model_func
-        self.train_interval = train_interval
+        self.train_script = train_script
         self.train_kwargs = train_kwargs
         self.min_examples_for_train = min_examples_for_train
         self.retrain_after_num_examples = retrain_after_num_examples
@@ -114,6 +114,7 @@ class ModelManager(object):
         return self._redis.get(f'project:{project}:res')
 
     def setup(self, project, schema):
+        model = self.create_model_func(**schema)
         train_job = self._get_latest_finished_train_job(project)
         if train_job:
             resources = train_job.result
@@ -127,12 +128,16 @@ class ModelManager(object):
                         f' if your model training is not started at very beginning. Otherwise it is a bug.')
             return None
 
-        model = self.create_model_func(**schema)
-        model_version = model.load(resources)
-        if model_version is None:
-            logger.error(f'Found resources {resources}, but model is not loaded. Consequent API calls (e.g. predict)'
-                         f' will fail.')
+        try:
+            model_version = model.load(resources)
+        except Exception as exc:
+            logger.error(f'Couldn\'t load model for project {project} from resources {resources}', exc_info=True)
             return None
+        else:
+            if model_version is None:
+                logger.error(f'Found resources {resources}, but model is not loaded for project {project}. '
+                             f'Consequent API calls (e.g. predict) will fail.')
+                return None
         self._current_model[project] = model
         self._stash_resources(project, resources)
         logger.info(f'Model {model_version} successfully loaded for project {project}.')
