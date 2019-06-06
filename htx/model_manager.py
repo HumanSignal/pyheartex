@@ -1,10 +1,10 @@
 import os
-import multiprocessing as mp
 import logging
 import json
 import attr
 import io
 import shutil
+import queue
 
 from operator import attrgetter
 from redis import Redis
@@ -52,7 +52,7 @@ class ModelManager(object):
 
     _MODEL_LIST_FILE = 'model_list.txt'
     _DEFAULT_MODEL_VERSION = 'model'
-    queue = mp.Queue()
+    queue = queue.Queue()
 
     def __init__(
         self,
@@ -62,6 +62,7 @@ class ModelManager(object):
         data_dir='~/.heartex/data',
         min_examples_for_train=1,
         retrain_after_num_examples=1,
+        redis=None,
         redis_host='localhost',
         redis_port=6379,
         redis_queue='default',
@@ -85,11 +86,13 @@ class ModelManager(object):
         self.model_list_file = os.path.join(self.model_dir, self._MODEL_LIST_FILE)
 
         self._current_model = {}
-        self._redis = Redis(host=redis_host, port=redis_port)
+        if redis is not None:
+            self._redis = redis
+        else:
+            self._redis = Redis(host=redis_host, port=redis_port)
 
     def _get_latest_finished_train_job(self, project):
-        queue = Queue(name=self.redis_queue, connection=self._redis)
-        registry = FinishedJobRegistry(queue.name, queue.connection)
+        registry = FinishedJobRegistry(self.redis_queue, self._redis)
         if registry.count == 0:
             logger.info('Train job registry is empty.')
             return None
@@ -281,8 +284,7 @@ class ModelManager(object):
             # TODO: do we need the locks here?
             shutil.rmtree(project_data_dir)
 
-    def train_loop(self, data_queue, train_script):
-        redis = Redis(host=self.redis_host, port=self.redis_port)
+    def train_loop(self, data_queue, train_script, redis):
         redis_queue = Queue(name=self.redis_queue, connection=redis)
         logger.info(f'Train loop starts: PID={os.getpid()}, Redis connection: {redis}, queue: {redis_queue}')
         for queued_items, in iter(data_queue.get, None):
