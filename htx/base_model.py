@@ -25,6 +25,7 @@ LIST_TYPE = 'Ranker'
 @attr.s
 class DataItem(object):
     input = attr.ib()
+    id = attr.ib(default=None)
     output = attr.ib(default=None)
     meta = attr.ib(default=None)
 
@@ -40,6 +41,7 @@ class BaseModel(ABC):
         self.input_values = input_values
 
         self._model = None
+        self._cluster = {}
 
     def get_input(self, task):
         if 'data' not in task:
@@ -134,12 +136,20 @@ class BaseModel(ABC):
         if for_train:
             try:
                 task_output = self.get_output(task)
+                task_id = task['id']
             except Exception as e:
-                logger.error(f'Cannot parse task output from {task}. Reason: {e}')
+                logger.error(f'Cannot parse task output from {task}. Reason: {e}', exc_info=True)
                 return DataItem(None)
         else:
             task_output = None
-        return DataItem(input=task_input, output=task_output, meta=task.get('meta'))
+        return DataItem(input=task_input, output=task_output, meta=task.get('meta'), id=task_id)
+
+    def assign_cluster(self, task):
+        if task['id'] in self._cluster:
+            return self._cluster[task['id']]
+        else:
+            # by default any unknown new point belongs to its own cluster
+            return len(self._cluster)
 
     @abstractmethod
     def predict(self, tasks):

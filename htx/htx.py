@@ -52,6 +52,15 @@ def _upload():
     return jsonify({'status': 'ok'})
 
 
+@_server.route('/cluster', methods=['POST'])
+def _cluster():
+    data = json.loads(request.data)
+    tasks = data['tasks']
+    project = data['project']
+    result = _model_manager.cluster(tasks, project)
+    return jsonify({'status': 'ok', 'result': result})
+
+
 @_server.route('/train', methods=['POST'])
 def _train():
     data = json.loads(request.data)

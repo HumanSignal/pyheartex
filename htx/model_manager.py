@@ -215,6 +215,12 @@ class ModelManager(object):
 
         self.queue.put((queued_items,))
 
+    def cluster(self, tasks, project):
+        result = []
+        for task in tasks:
+            result.append({'id': task['id'], 'cluster': self._current_model[project].assign_cluster(task)})
+        return result
+
     def _run_train_script(self, queue, train_script, data_dir, project):
         project_model_dir = os.path.join(self.model_dir, project)
         job = queue.enqueue(
