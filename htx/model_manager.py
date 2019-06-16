@@ -16,6 +16,18 @@ from rq.job import Job
 logger = logging.getLogger(__name__)
 
 
+@attr.s
+class ModelWrapper(object):
+    model = attr.ib()
+    version = attr.ib()
+
+    def predict(self, *args, **kwargs):
+        return self.model.predict(*args, **kwargs)
+
+    def get_data_item(self, *args, **kwargs):
+        return self.model.get_data_item(*args, **kwargs)
+
+
 class QueuedItem(object):
 
     def __init__(self, project):
@@ -41,7 +53,10 @@ class QueuedWaitSignal(QueuedItem):
 
 
 class QueuedTrainSignal(QueuedItem):
-    pass
+
+    def __init__(self, project, force=True):
+        super(QueuedTrainSignal, self).__init__(project)
+        self.force = force
 
 
 class QueuedFlushAllSignal(QueuedItem):
@@ -141,7 +156,7 @@ class ModelManager(object):
                 logger.error(f'Found resources {resources}, but model is not loaded for project {project}. '
                              f'Consequent API calls (e.g. predict) will fail.')
                 return None
-        self._current_model[project] = model
+        self._current_model[project] = ModelWrapper(model, model_version)
         self._stash_resources(project, resources)
         logger.info(f'Model {model_version} successfully loaded for project {project}.')
         return model_version
@@ -177,7 +192,7 @@ class ModelManager(object):
         else:
             queued_items = [
                 QueuedDataItem(data_item, project),
-                QueuedTrainSignal(project)
+                QueuedTrainSignal(project, force=False)
             ]
             self.queue.put((queued_items,))
 
@@ -308,7 +323,10 @@ class ModelManager(object):
                 elif isinstance(queued_item, QueuedTrainSignal):
                     try:
                         total_items = self._update_counters(redis, project)
-                        if total_items >= self.min_examples_for_train and total_items % self.retrain_after_num_examples == 0:
+                        if queued_item.force or (
+                            total_items >= self.min_examples_for_train and
+                            total_items % self.retrain_after_num_examples == 0
+                        ):
                             self._run_train_script(redis_queue, train_script, project_data_dir, project)
                     except Exception as error:
                         logger.error(f'Failed to start training job. Reason: {error}', exc_info=True)
