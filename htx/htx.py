@@ -1,7 +1,9 @@
 import json
 import multiprocessing as mp
 import logging
+import threading
 
+from queue import Queue
 from flask import Flask, request, jsonify
 
 from htx.model_manager import ModelManager
@@ -19,9 +21,9 @@ def init_model_server(**kwargs):
 
 @_server.before_first_request
 def launch_train_loop():
-    train_process = mp.Process(
+    train_process = threading.Thread(
         target=_model_manager.train_loop,
-        args=(_model_manager.queue, _model_manager.train_script)
+        args=(_model_manager.queue, _model_manager.train_script, _model_manager.redis, )
     )
     train_process.start()
 
