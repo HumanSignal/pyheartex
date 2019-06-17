@@ -126,30 +126,20 @@ class BaseModel(ABC):
 
         return schemas
 
-    def get_data_item(self, task, for_train=True):
+    def get_data_item(self, task):
+        meta = task.get('meta')
+        id = task.get('id')
         try:
             task_input = self.get_input(task)
         except Exception as e:
             logger.error(f'Cannot parse task input from {task}. Reason: {e}')
-            return DataItem(None)
-
-        if for_train:
-            try:
-                task_output = self.get_output(task)
-                task_id = task['id']
-            except Exception as e:
-                logger.error(f'Cannot parse task output from {task}. Reason: {e}', exc_info=True)
-                return DataItem(None)
-        else:
-            task_output = None
-        return DataItem(input=task_input, output=task_output, meta=task.get('meta'), id=task_id)
-
-    def assign_cluster(self, task):
-        if task['id'] in self._cluster:
-            return self._cluster[task['id']]
-        else:
-            # by default any unknown new point belongs to its own cluster
-            return len(self._cluster)
+            return DataItem(input=None, output=None, id=id, meta=meta)
+        try:
+            task_output = self.get_output(task)
+        except Exception as e:
+            logger.error(f'Cannot parse task output from {task}. Reason: {e}', exc_info=True)
+            return DataItem(input=task_input, output=None, id=id, meta=meta)
+        return DataItem(input=task_input, output=task_output, meta=meta, id=id)
 
     @abstractmethod
     def predict(self, tasks):
