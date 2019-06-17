@@ -1,8 +1,9 @@
 # pyheartex
 
-Python interface for running ML backend server and using it for active learning & prediction within [Heartex platform](https://www.heartex.net)
+Python interface for running ML backend server and using it for active learning & prelabeling & prediction within [Heartex platform](https://www.heartex.net)
 
 # Installation
+
 ```bash
 git clone https://github.com/heartexlabs/pyheartex.git
 cd pyheartex/
@@ -11,29 +12,37 @@ pip install -e .
 ```
 
 # Quick start
-Assume you want to build prediction service that classifies short texts onto 2 classes (e.g. cats/dogs).
 
-First thing you need to configure labeling project on [Heartex](www.heartex.net) (read [docs](http://go.heartex.net/static/docs/#/Business?id=create-new-project) for detailed explanation how to create projects on Heartex).
+Assume you want to build a prediction service that classifies short texts onto two classes (e.g., positive/negative).
 
-Use the following labeling config:
-```xml
+First thing you need to create a new project on [Heartex](go.heartex.net) (read [docs](http://go.heartex.net/static/docs/#/Business?id=create-new-project) for a detailed explanation of how to create a project).
+
+> Step 1
+
+Use the following config when create a project:
+```html
 <View>
-<Text name="my_text_1" value="$my_text"></Text>
-<Choices name="cats_or_dogs">
-  <Choice value="cats"></Choice>
-  <Choice value="dogs"></Choice>
-</Choices>
+  <Text name="txt-1" value="$my_text"></Text>
+  <Choices name="pos-neg" toName="txt-1">
+    <Choice value="positive"></Choice>
+    <Choice value="negative"></Choice>
+  </Choices>
 </View>
 ```
-Then you upload JSON file with the data:
+
+> Step 2
+
+Upload JSON file:
 ```json
 [
-  {"my_text": "сat says miaou"},
-  {"my_text": "dog says woof"}
+  {"my_text": "It was great"},
+  {"my_text": "Terrible, terible movie"}
 ]
 ```
-Heartex platform interacts with labelers and send data to the model server.
-The following scripts starts model server with simple text classifier
+
+> Step 3 
+
+Start model server running a text classifier
 
 ```bash
 cd examples/
@@ -42,9 +51,19 @@ pip install -r examples-requirements.txt
 python run.py --host localhost --port 8999 --debug
 ```
 
-Now you can send prediction request by using `TOKEN` and `PROJECT-ID` acquired [via Heartex]():
+> Step 4
+
+Configure your project settings to make use of the above model. Go into project settings, Machine Learning tag, click Add  Custom Model and input model name (whatever you like) and it's URL. If you've started it with the above script, it should be accessible through HTTP on port 8999 and your IP. For example, mine is running on http://12.248.117.34:8999
+
+> Step 5
+
+Label above examples through heartex interface
+
+> Step 6
+
+Now you can send prediction request by using `TOKEN` and `PROJECT-ID` acquired [via Heartex](https://go.heartex.net/):
 ```bash
 curl -X POST -H "Content-Type: application/json" -H "Authorization: Token <TOKEN>" \
--d '[{"my_text": "is this cat or dog?"}]' \
-http://go.heartex.net/api/projects/<PROJECT-ID>/predict
+-d '[{"my_text": "great, great!"}]' \
+https://go.heartex.net/api/projects/<PROJECT-ID>/predict/
 ```
