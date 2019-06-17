@@ -17,7 +17,7 @@ Assume you want to build a prediction service that classifies short texts onto t
 
 First thing you need to create a new project on [Heartex](go.heartex.net) (read [docs](http://go.heartex.net/static/docs/#/Business?id=create-new-project) for a detailed explanation of how to create a project).
 
-> Step 1
+### Step 1
 
 Use the following config when create a project:
 ```html
@@ -30,7 +30,7 @@ Use the following config when create a project:
 </View>
 ```
 
-> Step 2
+### Step 2
 
 Upload JSON file:
 ```json
@@ -40,7 +40,7 @@ Upload JSON file:
 ]
 ```
 
-> Step 3 
+### Step 3 
 
 Start model server running a text classifier
 
@@ -51,15 +51,15 @@ pip install -r examples-requirements.txt
 python run.py --host localhost --port 8999 --debug
 ```
 
-> Step 4
+### Step 4
 
 Configure your project settings to make use of the above model. Go into project settings, Machine Learning tag, click Add  Custom Model and input model name (whatever you like) and it's URL. If you've started it with the above script, it should be accessible through HTTP on port 8999 and your IP. For example, mine is running on http://12.248.117.34:8999
 
-> Step 5
+### Step 5
 
-Label above examples through heartex interface
+Label above examples through the Heartex interface
 
-> Step 6
+### Step 6
 
 Now you can send prediction request by using `TOKEN` and `PROJECT-ID` acquired [via Heartex](https://go.heartex.net/):
 ```bash
