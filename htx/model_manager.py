@@ -53,7 +53,6 @@ class QueuedWaitSignal(QueuedItem):
 
 
 class QueuedTrainSignal(QueuedItem):
-
     def __init__(self, project, force=True):
         super(QueuedTrainSignal, self).__init__(project)
         self.force = force
