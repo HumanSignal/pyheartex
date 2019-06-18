@@ -18,7 +18,7 @@ IMAGE_TYPE = 'Image'
 # Output types
 CHOICES_TYPE = 'Choices'
 LABELS_TYPE = 'Labels'
-BOUNDING_BOX_TYPE = 'AddRectangleButton'
+BOUNDING_BOX_TYPE = 'RectangleLabels'
 LIST_TYPE = 'Ranker'
 
 
@@ -242,7 +242,7 @@ class SingleLabelsBaseModel(BaseModel):
 
 
 class BoundingBoxBaseModel(BaseModel):
-    OUTPUT_TYPES = (LABELS_TYPE, BOUNDING_BOX_TYPE)
+    OUTPUT_TYPES = (BOUNDING_BOX_TYPE,)
 
     def get_output(self, task):
         input_name = self.input_names[0]
@@ -257,7 +257,7 @@ class BoundingBoxBaseModel(BaseModel):
                 'y': value['y'],
                 'width': value['width'],
                 'height': value['height'],
-                'label': value['labels'][0]
+                'label': value['rectanglelabels'][0]
             })
         return output
 
@@ -272,7 +272,7 @@ class BoundingBoxBaseModel(BaseModel):
                     'from_name': output_name,
                     'to_name': input_name,
                     'value': {
-                        'labels': [bbox['label']],
+                        'rectanglelabels': [bbox['label']],
                         'x': bbox['x'],
                         'y': bbox['y'],
                         'height': bbox['height'],

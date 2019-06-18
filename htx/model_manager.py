@@ -41,7 +41,9 @@ class QueuedWaitSignal(QueuedItem):
 
 
 class QueuedTrainSignal(QueuedItem):
-    pass
+    def __init__(self, project, force=True):
+        super(QueuedTrainSignal, self).__init__(project)
+        self.force = force
 
 
 class QueuedFlushAllSignal(QueuedItem):
@@ -174,7 +176,7 @@ class ModelManager(object):
         else:
             queued_items = [
                 QueuedDataItem(data_item, project),
-                QueuedTrainSignal(project)
+                QueuedTrainSignal(project, force=False)
             ]
             self.queue.put((queued_items,))
 
@@ -301,7 +303,10 @@ class ModelManager(object):
                 elif isinstance(queued_item, QueuedTrainSignal):
                     try:
                         total_items = self._update_counters(redis, project)
-                        if total_items >= self.min_examples_for_train and total_items % self.retrain_after_num_examples == 0:
+                        if queued_item.force or (
+                            total_items >= self.min_examples_for_train and
+                            total_items % self.retrain_after_num_examples == 0
+                        ):
                             self._run_train_script(redis_queue, train_script, project_data_dir, project)
                     except Exception as error:
                         logger.error(f'Failed to start training job. Reason: {error}', exc_info=True)
