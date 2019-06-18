@@ -173,11 +173,11 @@ class SingleChoiceBaseModel(BaseModel):
                              f'output_name={output_name}')
         return single_choice
 
-    def make_results(self, labels, scores):
+    def make_results(self, tasks, labels, scores):
         results = []
         input_name = self.input_names[0]
         output_name = self.output_names[0]
-        for label, score in zip(labels, scores):
+        for task, label, score in zip(tasks, labels, scores):
             if isinstance(label, str):
                 choices = [label]
             elif isinstance(label, (list, tuple)):
@@ -190,7 +190,8 @@ class SingleChoiceBaseModel(BaseModel):
                     'to_name': input_name,
                     'value': {'choices': choices}
                 }],
-                'score': score
+                'score': score,
+                'cluster': self._cluster.get(str(task['id']))
             })
         return results
 
