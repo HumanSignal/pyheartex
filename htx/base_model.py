@@ -7,7 +7,7 @@ from lxml import etree
 from abc import ABC, abstractmethod
 from itertools import product
 from operator import itemgetter
-
+from collections import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +158,8 @@ class SingleChoiceBaseModel(BaseModel):
     OUTPUT_TYPES = (CHOICES_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         single_choice = None
         input_name = self.input_names[0]
         output_name = self.output_names[0]
