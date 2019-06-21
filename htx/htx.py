@@ -48,7 +48,8 @@ def _upload():
     tasks = data['tasks']
     project = data['project']
     schema = data['schema']
-    _model_manager.upload_many(tasks, project, schema)
+    start_training = data.get('start_training', False)
+    _model_manager.upload_many(tasks, project, schema, start_training)
     return jsonify({'status': 'ok'})
 
 

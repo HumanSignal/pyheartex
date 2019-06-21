@@ -161,14 +161,14 @@ class ModelManager(object):
         model = self._current_model[project]
         data_items = []
         for task in request_data['tasks']:
-            data_items.append(attr.asdict(model.get_data_item(task, for_train=False)))
+            data_items.append(attr.asdict(model.get_data_item(task)))
         results = model.predict(data_items)
 
         return results
 
     def update(self, task, project, schema):
         model = self.create_model_func(**schema)
-        data_item = model.get_data_item(task, for_train=True)
+        data_item = model.get_data_item(task)
         if not data_item.input:
             logger.warning(f'Input is missing for {data_item}: skip using it.')
         elif not data_item.output:
@@ -180,17 +180,9 @@ class ModelManager(object):
             ]
             self.queue.put((queued_items,))
 
-    def update_many(self, tasks, project, schema, for_train=True):
+    def update_many(self, tasks, project, schema):
         model = self.create_model_func(**schema)
-        data_items = []
-        for task in tasks:
-            data_item = model.get_data_item(task, for_train=for_train)
-            if not data_item.input:
-                logger.warning(f'Input is missing for {data_item}: skip using it.')
-            elif not data_item.output:
-                logger.warning(f'Output is missing for {data_item}: skip using it.')
-            else:
-                data_items.append(data_item)
+        data_items = list(map(model.get_data_item, tasks))
         queued_items = [
             QueuedFlushAllSignal(project),
             QueuedDataItems(data_items, project),
@@ -216,6 +208,12 @@ class ModelManager(object):
             queued_items.append(QueuedTrainSignal(project))
 
         self.queue.put((queued_items,))
+
+    def cluster(self, tasks, project):
+        result = []
+        for task in tasks:
+            result.append({'id': task['id'], 'cluster': self._current_model[project].assign_cluster(task)})
+        return result
 
     def _run_train_script(self, queue, train_script, data_dir, project):
         project_model_dir = os.path.join(self.model_dir, project)
@@ -250,10 +248,7 @@ class ModelManager(object):
             output_file = os.path.join(project_data_dir, 'data.jsonl')
             with io.open(output_file, mode='a') as fout:
                 for data_item in data_items:
-                    item = {'input': data_item['input'], 'output': data_item['output']}
-                    if data_item['meta']:
-                        item['meta'] = data_item['meta']
-                    jsonl = json.dumps(item, ensure_ascii=False)
+                    jsonl = json.dumps(data_item, ensure_ascii=False)
                     fout.write(jsonl + '\n')
         except Exception:
             logger.error(f'Failed to store data to {output_file}', exc_info=True)

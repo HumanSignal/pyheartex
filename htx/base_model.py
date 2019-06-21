@@ -2,12 +2,13 @@ import logging
 import json
 import attr
 import xmljson
+import numpy as np
 
 from lxml import etree
 from abc import ABC, abstractmethod
 from itertools import product
 from operator import itemgetter
-
+from collections import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ LIST_TYPE = 'Ranker'
 @attr.s
 class DataItem(object):
     input = attr.ib()
+    id = attr.ib(default=None)
     output = attr.ib(default=None)
     meta = attr.ib(default=None)
 
@@ -40,6 +42,7 @@ class BaseModel(ABC):
         self.input_values = input_values
 
         self._model = None
+        self._cluster = {}
 
     def get_input(self, task):
         if 'data' not in task:
@@ -124,22 +127,20 @@ class BaseModel(ABC):
 
         return schemas
 
-    def get_data_item(self, task, for_train=True):
+    def get_data_item(self, task):
+        meta = task.get('meta')
+        id = task.get('id')
         try:
             task_input = self.get_input(task)
         except Exception as e:
             logger.error(f'Cannot parse task input from {task}. Reason: {e}')
-            return DataItem(None)
-
-        if for_train:
-            try:
-                task_output = self.get_output(task)
-            except Exception as e:
-                logger.error(f'Cannot parse task output from {task}. Reason: {e}')
-                return DataItem(None)
-        else:
-            task_output = None
-        return DataItem(input=task_input, output=task_output, meta=task.get('meta'))
+            return DataItem(input=None, output=None, id=id, meta=meta)
+        try:
+            task_output = self.get_output(task)
+        except Exception as e:
+            logger.error(f'Cannot parse task output from {task}. Reason: {e}', exc_info=True)
+            return DataItem(input=task_input, output=None, id=id, meta=meta)
+        return DataItem(input=task_input, output=task_output, meta=meta, id=id)
 
     @abstractmethod
     def predict(self, tasks):
@@ -158,6 +159,8 @@ class SingleChoiceBaseModel(BaseModel):
     OUTPUT_TYPES = (CHOICES_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         single_choice = None
         input_name = self.input_names[0]
         output_name = self.output_names[0]
@@ -173,11 +176,11 @@ class SingleChoiceBaseModel(BaseModel):
                              f'output_name={output_name}')
         return single_choice
 
-    def make_results(self, labels, scores):
+    def make_results(self, tasks, labels, scores):
         results = []
         input_name = self.input_names[0]
         output_name = self.output_names[0]
-        for label, score in zip(labels, scores):
+        for task, label, score in zip(tasks, labels, scores):
             if isinstance(label, str):
                 choices = [label]
             elif isinstance(label, (list, tuple)):
@@ -190,7 +193,8 @@ class SingleChoiceBaseModel(BaseModel):
                     'to_name': input_name,
                     'value': {'choices': choices}
                 }],
-                'score': score
+                'score': score,
+                'cluster': self._cluster.get(str(task['id']))
             })
         return results
 
@@ -200,6 +204,8 @@ class SingleLabelsBaseModel(BaseModel):
     OUTPUT_TYPES = (LABELS_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         spans = []
         input_name = self.input_names[0]
         output_name = self.output_names[0]
@@ -220,11 +226,11 @@ class SingleLabelsBaseModel(BaseModel):
                 })
         return spans
 
-    def make_results(self, list_of_spans, scores):
+    def make_results(self, tasks, list_of_spans, scores):
         results = []
         input_name = self.input_names[0]
         output_name = self.output_names[0]
-        for spans, score in zip(list_of_spans, scores):
+        for task, spans, score in zip(tasks, list_of_spans, scores):
             result = []
             for span in spans:
                 result.append({
@@ -237,7 +243,11 @@ class SingleLabelsBaseModel(BaseModel):
                         'text': span['substr']
                     }
                 })
-            results.append({'result': result, 'score': score})
+            results.append({
+                'result': result,
+                'score': score,
+                'cluster': self._cluster.get(str(task['id']))
+            })
         return results
 
 
@@ -245,6 +255,8 @@ class BoundingBoxBaseModel(BaseModel):
     OUTPUT_TYPES = (BOUNDING_BOX_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         input_name = self.input_names[0]
         labels_name = self.output_names[0]
         output = []
@@ -261,11 +273,11 @@ class BoundingBoxBaseModel(BaseModel):
             })
         return output
 
-    def make_result(self, list_of_bboxes, scores):
+    def make_result(self, tasks, list_of_bboxes, scores):
         results = []
         input_name = self.input_names[0] if self.input_names else None
         output_name = self.output_names[0] if self.output_names else None
-        for bboxes, score in zip(list_of_bboxes, scores):
+        for task, bboxes, score in zip(tasks, list_of_bboxes, scores):
             result = []
             for bbox in bboxes:
                 result.append({
@@ -279,7 +291,11 @@ class BoundingBoxBaseModel(BaseModel):
                         'width': bbox['width']
                     }
                 })
-            results.append({'result': result, 'score': score})
+            results.append({
+                'result': result,
+                'score': score,
+                'cluster': self._cluster.get(str(task['id']))
+            })
         return results
 
 
@@ -287,6 +303,8 @@ class ListBaseModel(BaseModel):
     OUTPUT_TYPES = (LIST_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         input_name = self.input_names[0]
         output_name = self.output_names[0]
         for r in task['result']:
@@ -300,11 +318,11 @@ class ListBaseModel(BaseModel):
             }
         logger.warning(f'Can\'t get output for {self.__class__.__name__} from {task}')
 
-    def make_result(self, list_scores, list_items):
+    def make_result(self, tasks, list_scores, list_items):
         results = []
         input_name = self.input_names[0] if self.input_names else None
         output_name = self.output_names[0] if self.output_names else None
-        for scores, items in zip(list_scores, list_items):
+        for task, scores, items in zip(tasks, list_scores, list_items):
             results.append({
                 'result': [{
                     'from_name': output_name,
@@ -314,7 +332,9 @@ class ListBaseModel(BaseModel):
                         'selected': [0] * len(scores),
                         'items': items
                     }
-                }]
+                }],
+                'score': np.mean(scores),
+                'cluster': self._cluster.get(str(task['id']))
             })
         return results
 
