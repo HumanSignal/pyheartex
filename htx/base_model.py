@@ -2,6 +2,7 @@ import logging
 import json
 import attr
 import xmljson
+import numpy as np
 
 from lxml import etree
 from abc import ABC, abstractmethod
@@ -203,6 +204,8 @@ class SingleLabelsBaseModel(BaseModel):
     OUTPUT_TYPES = (LABELS_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         spans = []
         input_name = self.input_names[0]
         output_name = self.output_names[0]
@@ -223,11 +226,11 @@ class SingleLabelsBaseModel(BaseModel):
                 })
         return spans
 
-    def make_results(self, list_of_spans, scores):
+    def make_results(self, tasks, list_of_spans, scores):
         results = []
         input_name = self.input_names[0]
         output_name = self.output_names[0]
-        for spans, score in zip(list_of_spans, scores):
+        for task, spans, score in zip(tasks, list_of_spans, scores):
             result = []
             for span in spans:
                 result.append({
@@ -240,7 +243,11 @@ class SingleLabelsBaseModel(BaseModel):
                         'text': span['substr']
                     }
                 })
-            results.append({'result': result, 'score': score})
+            results.append({
+                'result': result,
+                'score': score,
+                'cluster': self._cluster.get(str(task['id']))
+            })
         return results
 
 
@@ -248,6 +255,8 @@ class BoundingBoxBaseModel(BaseModel):
     OUTPUT_TYPES = (BOUNDING_BOX_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         input_name = self.input_names[0]
         labels_name = self.output_names[0]
         output = []
@@ -264,11 +273,11 @@ class BoundingBoxBaseModel(BaseModel):
             })
         return output
 
-    def make_result(self, list_of_bboxes, scores):
+    def make_result(self, tasks, list_of_bboxes, scores):
         results = []
         input_name = self.input_names[0] if self.input_names else None
         output_name = self.output_names[0] if self.output_names else None
-        for bboxes, score in zip(list_of_bboxes, scores):
+        for task, bboxes, score in zip(tasks, list_of_bboxes, scores):
             result = []
             for bbox in bboxes:
                 result.append({
@@ -282,7 +291,11 @@ class BoundingBoxBaseModel(BaseModel):
                         'width': bbox['width']
                     }
                 })
-            results.append({'result': result, 'score': score})
+            results.append({
+                'result': result,
+                'score': score,
+                'cluster': self._cluster.get(str(task['id']))
+            })
         return results
 
 
@@ -290,6 +303,8 @@ class ListBaseModel(BaseModel):
     OUTPUT_TYPES = (LIST_TYPE,)
 
     def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
         input_name = self.input_names[0]
         output_name = self.output_names[0]
         for r in task['result']:
@@ -303,11 +318,11 @@ class ListBaseModel(BaseModel):
             }
         logger.warning(f'Can\'t get output for {self.__class__.__name__} from {task}')
 
-    def make_result(self, list_scores, list_items):
+    def make_result(self, tasks, list_scores, list_items):
         results = []
         input_name = self.input_names[0] if self.input_names else None
         output_name = self.output_names[0] if self.output_names else None
-        for scores, items in zip(list_scores, list_items):
+        for task, scores, items in zip(tasks, list_scores, list_items):
             results.append({
                 'result': [{
                     'from_name': output_name,
@@ -317,7 +332,9 @@ class ListBaseModel(BaseModel):
                         'selected': [0] * len(scores),
                         'items': items
                     }
-                }]
+                }],
+                'score': np.mean(scores),
+                'cluster': self._cluster.get(str(task['id']))
             })
         return results
 
