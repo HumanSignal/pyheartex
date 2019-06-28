@@ -150,6 +150,7 @@ class ModelManager(object):
 
     def predict(self, request_data):
         project = request_data['project']
+        model_version = request_data['model_version']
         if project not in self._current_model:
             # try to initialize model
             model_version = self.setup(project, request_data['schema'])
@@ -163,8 +164,10 @@ class ModelManager(object):
         for task in request_data['tasks']:
             data_items.append(attr.asdict(model.get_data_item(task)))
         results = model.predict(data_items)
-
-        return results
+        return {
+            'model_version': model_version,
+            'results': results
+        }
 
     def update(self, task, project, schema):
         model = self.create_model_func(**schema)
@@ -208,12 +211,6 @@ class ModelManager(object):
             queued_items.append(QueuedTrainSignal(project))
 
         self.queue.put((queued_items,))
-
-    def cluster(self, tasks, project):
-        result = []
-        for task in tasks:
-            result.append({'id': task['id'], 'cluster': self._current_model[project].assign_cluster(task)})
-        return result
 
     def _run_train_script(self, queue, train_script, data_dir, project):
         project_model_dir = os.path.join(self.model_dir, project)
@@ -304,7 +301,7 @@ class ModelManager(object):
                     try:
                         total_items = self._update_counters(redis, project)
                         if queued_item.force or (
-                            total_items >= self.min_examples_for_train and
+                            total_items == self.min_examples_for_train or
                             total_items % self.retrain_after_num_examples == 0
                         ):
                             self._run_train_script(redis_queue, train_script, project_data_dir, project)
