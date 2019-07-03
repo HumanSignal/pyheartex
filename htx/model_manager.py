@@ -9,6 +9,7 @@ from redis import Redis
 from rq import Queue
 from rq.registry import StartedJobRegistry, FinishedJobRegistry
 from rq.job import Job
+from rq.exceptions import NoSuchJobError
 from .utils import generate_version
 from .base_model import DataItem
 
@@ -54,11 +55,11 @@ class ModelManager(object):
         job = self._redis_queue.enqueue(
             self.train_script_wrapper,
             args=(self.train_script, self.redis_host, self.redis_port, self.model_dir, project, self.train_kwargs),
-            job_timeout='24h',
+            job_timeout='365d',
             ttl=-1,
-            result_ttl=-1,
+            result_ttl='1d',
             failure_ttl=300,
-            meta={'project': project}
+            meta={'project': project},
         )
         logger.info(f'Training job {job} started for project {project}')
         return job
@@ -97,6 +98,17 @@ class ModelManager(object):
     def validate(self, config):
         return self.create_model_func().get_valid_schemas(config)
 
+    def job_status(self, job_id):
+        try:
+            job = Job.fetch(job_id, connection=self._redis)
+        except NoSuchJobError:
+            logger.error(f'Can\'t get job status {job_id}: no such job', exc_info=True)
+        else:
+            status = job.get_status()
+            error = job.exc_info
+            ended_at = job.ended_at
+            return status, error, ended_at
+
     def predict(self, tasks, project, schema=None, model_version=None):
         if not hasattr(self, '_current_model'):
             # This ensures each subprocess loads its own copy of model to avoid pre-fork initializations
@@ -133,10 +145,10 @@ class ModelManager(object):
             for serialized_item in redis.lrange(cls.get_tasks_key(project), 0, -1)
         )
         t = time.time()
-        resources_dict = train_script(data_stream, workdir, **train_kwargs)
+        resources = train_script(data_stream, workdir, **train_kwargs)
         redis.rpush(cls.get_job_results_key(project), json.dumps({
             'status': 'ok',
-            'resources': resources_dict,
+            'resources': resources,
             'project': project,
             'workdir': workdir,
             'version': version,

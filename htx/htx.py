@@ -83,3 +83,17 @@ def _validate():
         return jsonify(validated_schemas)
     else:
         return jsonify({'status': 'failed'}), 422
+
+
+@_server.route('/job_status', methods=['POST'])
+def _job_status():
+    data = json.loads(request.data)
+    job = data['job']
+    logger.info(f'Request: job status for {job}')
+    job_status, error, ended_at = _model_manager.job_status(job)
+    response = {
+        'job_status': job_status,
+        'error': error,
+        'ended_at': ended_at
+    }
+    return jsonify(response)
