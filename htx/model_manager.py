@@ -106,8 +106,11 @@ class ModelManager(object):
         else:
             status = job.get_status()
             error = job.exc_info
+            created_at = job.created_at
+            enqueued_at = job.enqueued_at
+            started_at = job.started_at
             ended_at = job.ended_at
-            return status, error, ended_at
+            return status, error, created_at, enqueued_at, started_at, ended_at
 
     def predict(self, tasks, project, schema=None, model_version=None):
         if not hasattr(self, '_current_model'):

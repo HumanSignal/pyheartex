@@ -90,10 +90,13 @@ def _job_status():
     data = json.loads(request.data)
     job = data['job']
     logger.info(f'Request: job status for {job}')
-    job_status, error, ended_at = _model_manager.job_status(job)
+    job_status, error, created_at, enqueued_at, started_at, ended_at = _model_manager.job_status(job)
     response = {
         'job_status': job_status,
         'error': error,
+        'created_at': created_at,
+        'enqueued_at': enqueued_at,
+        'started_at': started_at,
         'ended_at': ended_at
     }
     return jsonify(response)
