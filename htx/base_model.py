@@ -30,6 +30,17 @@ class DataItem(object):
     output = attr.ib(default=None)
     meta = attr.ib(default=None)
 
+    @property
+    def empty_output(self):
+        return self.output is None
+
+    def serialize(self):
+        return json.dumps(attr.asdict(self))
+
+    @classmethod
+    def deserialize_to_dict(cls, serialized_data_item):
+        return json.loads(serialized_data_item)
+
 
 class BaseModel(ABC):
 
