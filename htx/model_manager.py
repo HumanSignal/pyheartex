@@ -6,10 +6,9 @@ import shutil
 import time
 
 from redis import Redis
-from rq import Queue
+from rq import Queue, get_current_job
 from rq.registry import StartedJobRegistry, FinishedJobRegistry
 from rq.job import Job
-from rq.exceptions import NoSuchJobError
 from .utils import generate_version
 from .base_model import DataItem
 
@@ -100,13 +99,17 @@ class ModelManager(object):
 
     def job_status(self, job_id):
         job = Job.fetch(job_id, connection=self._redis)
-        status = job.get_status()
-        error = job.exc_info
-        created_at = job.created_at
-        enqueued_at = job.enqueued_at
-        started_at = job.started_at
-        ended_at = job.ended_at
-        return status, error, created_at, enqueued_at, started_at, ended_at
+        response = {
+            'job_status': job.get_status(),
+            'error': job.exc_info,
+            'created_at': job.created_at,
+            'enqueued_at': job.enqueued_at,
+            'started_at': job.started_at,
+            'ended_at': job.ended_at
+        }
+        if job.is_finished and isinstance(job.result, str):
+            response['result'] = json.loads(job.result)
+        return response
 
     def predict(self, tasks, project, schema=None, model_version=None):
         if not hasattr(self, '_current_model'):
@@ -145,14 +148,17 @@ class ModelManager(object):
         )
         t = time.time()
         resources = train_script(data_stream, workdir, **train_kwargs)
-        redis.rpush(cls.get_job_results_key(project), json.dumps({
+        job_result = json.dumps({
             'status': 'ok',
             'resources': resources,
             'project': project,
             'workdir': workdir,
             'version': version,
+            'job_id': get_current_job().id,
             'time': time.time() - t
-        }))
+        })
+        redis.rpush(cls.get_job_results_key(project), job_result)
+        return job_result
 
     def update(self, task, project, schema, retrain):
         model = self.create_model_func(**schema)
