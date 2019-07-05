@@ -1,7 +1,9 @@
 import json
 import logging
 
+
 from flask import Flask, request, jsonify
+from rq.exceptions import NoSuchJobError
 
 from htx.model_manager import ModelManager
 
@@ -83,6 +85,11 @@ def _validate():
         return jsonify(validated_schemas)
     else:
         return jsonify({'status': 'failed'}), 422
+
+
+@_server.errorhandler(NoSuchJobError)
+def special_exception_handler(error):
+    return str(error), 410
 
 
 @_server.route('/job_status', methods=['POST'])

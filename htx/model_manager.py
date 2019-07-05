@@ -99,18 +99,14 @@ class ModelManager(object):
         return self.create_model_func().get_valid_schemas(config)
 
     def job_status(self, job_id):
-        try:
-            job = Job.fetch(job_id, connection=self._redis)
-        except NoSuchJobError:
-            logger.error(f'Can\'t get job status {job_id}: no such job', exc_info=True)
-        else:
-            status = job.get_status()
-            error = job.exc_info
-            created_at = job.created_at
-            enqueued_at = job.enqueued_at
-            started_at = job.started_at
-            ended_at = job.ended_at
-            return status, error, created_at, enqueued_at, started_at, ended_at
+        job = Job.fetch(job_id, connection=self._redis)
+        status = job.get_status()
+        error = job.exc_info
+        created_at = job.created_at
+        enqueued_at = job.enqueued_at
+        started_at = job.started_at
+        ended_at = job.ended_at
+        return status, error, created_at, enqueued_at, started_at, ended_at
 
     def predict(self, tasks, project, schema=None, model_version=None):
         if not hasattr(self, '_current_model'):
