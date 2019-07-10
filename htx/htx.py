@@ -88,8 +88,13 @@ def _validate():
 
 
 @_server.errorhandler(NoSuchJobError)
-def special_exception_handler(error):
+def no_such_job_error_handler(error):
     return str(error), 410
+
+
+@_server.errorhandler(FileNotFoundError)
+def file_not_found_error_handler(error):
+    return str(error), 404
 
 
 @_server.route('/job_status', methods=['POST'])

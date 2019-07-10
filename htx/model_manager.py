@@ -15,6 +15,12 @@ from .base_model import DataItem
 logger = logging.getLogger(__name__)
 
 
+@attr.s
+class ModelWrapper(object):
+    model = attr.ib()
+    model_version = attr.ib()
+
+
 class ModelManager(object):
 
     def __init__(
@@ -71,28 +77,48 @@ class ModelManager(object):
     def get_job_results_key(cls, project):
         return f'project:{project}:job_results'
 
-    def _create_model_from_finished_jobs(self, project, schema):
+    def _get_latest_job_result(self, project):
         job_results_key = self.get_job_results_key(project)
         num_finished_jobs = self._redis.llen(job_results_key)
         if num_finished_jobs == 0:
             logger.info(f'No one finished training jobs found by key {job_results_key}. Redis: {self._redis}')
-            return None, None
-        latest_job_result = json.loads(self._redis.lindex(job_results_key, -1))
-        resources = latest_job_result['resources']
-        model_version = latest_job_result['version']
+            return None
+        return json.loads(self._redis.lindex(job_results_key, -1))
+
+    def _create_model_from_job_result(self, job_result, schema):
+        resources = job_result['resources']
         model = self.create_model_func(**schema)
         model.load(resources)
-        return model, model_version
+        return model
 
     def setup(self, project, schema):
-        model, model_version = self._create_model_from_finished_jobs(project, schema)
-        if model is not None:
-            if not hasattr(self, '_current_model'):
-                # This ensures each subprocess loads its own copy of model to avoid pre-fork initializations
-                self._current_model = {}
-            self._current_model[project] = model
-            logger.info(f'Model {model_version} successfully loaded for project {project}.')
-        return model_version
+        if not hasattr(self, '_current_model'):
+            # This ensures each subprocess loads its own copy of model to avoid pre-fork initializations
+            self._current_model = {}
+
+        current_model = self._current_model.get(project)
+        job_result = self._get_latest_job_result(project)
+
+        # if job queue is empty, leave current model or raise 404 if model doesn't exists
+        if job_result is None:
+            if current_model is not None:
+                logger.info(f'Project {project} has active model version {current_model.model_version}. '
+                            f'Can\'t load any newest one since job results queue is empty.')
+                return current_model.model_version
+            raise FileNotFoundError(f'Can\'t retrieve any job result for project {project}')
+
+        # if current model has the same model version as from latest job, leave current model
+        model_version_from_job_result = job_result['version']
+        if current_model and current_model.model_version == model_version_from_job_result:
+            logger.info(f'Model for project {project} is already up-to-date (version={current_model.model_version}), '
+                        f'loading is unnecessary')
+            return current_model.model_version
+
+        # if latest job result has newer model version, reload current model
+        model = self._create_model_from_job_result(job_result, schema)
+        self._current_model[project] = ModelWrapper(model, model_version_from_job_result)
+        logger.info(f'Model {self._current_model[project].model_version} successfully loaded for project {project}.')
+        return self._current_model[project].model_version
 
     def validate(self, config):
         return self.create_model_func().get_valid_schemas(config)
@@ -115,23 +141,30 @@ class ModelManager(object):
         if not hasattr(self, '_current_model'):
             # This ensures each subprocess loads its own copy of model to avoid pre-fork initializations
             self._current_model = {}
+
         if self._current_model.get(project) is None:
+            # try to load model in lazy mode
             if schema is None:
                 raise ValueError(f'You are trying to get prediction for project {project}, but model is not loaded. '
-                                 f'We can fix it, but you should specify valid "schema" field in request')
-            # try to initialize model
-            model, model_version = self._create_model_from_finished_jobs(project, schema)
-            if model_version is not None:
-                logger.info(f'Model {model_version} is initialized for project {project} in lazy mode.')
-            else:
-                raise ValueError(f'Model is not loaded for project {project}')
-            self._current_model[project] = model
+                                 f'We can try to fix it, but you should specify valid "schema" field in request')
 
-        model = self._current_model[project]
+            # TODO: instead of just latest, here we can easily retrieve job result with requested model_version
+            job_result = self._get_latest_job_result(project)
+            if job_result is None:
+                raise FileNotFoundError(
+                    f'You are trying to get prediction for project {project}, but model is not loaded.'
+                    f'We have sought in the latest job results to load model in lazy mode, but results are empty'
+                )
+            model = self._create_model_from_job_result(job_result, schema)
+            version = job_result['version']
+            self._current_model[project] = ModelWrapper(model, version)
+            logger.info(f'Model {version} is initialized for project {project} in lazy mode.')
+
+        m = self._current_model[project]
         data_items = []
         for task in tasks:
-            data_items.append(attr.asdict(model.get_data_item(task)))
-        results = model.predict(data_items)
+            data_items.append(attr.asdict(m.model.get_data_item(task)))
+        results = m.model.predict(data_items)
         return results, model_version
 
     @classmethod
