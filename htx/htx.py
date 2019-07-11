@@ -87,6 +87,24 @@ def _validate():
         return jsonify({'status': 'failed'}), 422
 
 
+@_server.route('/job_status', methods=['POST'])
+def _job_status():
+    data = json.loads(request.data)
+    job = data['job']
+    logger.info(f'Request: job status for {job}')
+    response = _model_manager.job_status(job)
+    return jsonify(response)
+
+
+@_server.route('/delete', methods=['POST'])
+def _delete():
+    data = json.loads(request.data)
+    project = data['project']
+    logger.info(f'Request: delete project {project}')
+    _model_manager.delete(project)
+    return jsonify({})
+
+
 @_server.errorhandler(NoSuchJobError)
 def no_such_job_error_handler(error):
     return str(error), 410
@@ -95,12 +113,3 @@ def no_such_job_error_handler(error):
 @_server.errorhandler(FileNotFoundError)
 def file_not_found_error_handler(error):
     return str(error), 404
-
-
-@_server.route('/job_status', methods=['POST'])
-def _job_status():
-    data = json.loads(request.data)
-    job = data['job']
-    logger.info(f'Request: job status for {job}')
-    response = _model_manager.job_status(job)
-    return jsonify(response)
