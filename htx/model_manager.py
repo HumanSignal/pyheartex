@@ -62,7 +62,7 @@ class ModelManager(object):
             args=(self.train_script, self.redis_host, self.redis_port, self.model_dir, project, self.train_kwargs),
             job_timeout='365d',
             ttl=-1,
-            result_ttl='1d',
+            result_ttl=-1,
             failure_ttl=300,
             meta={'project': project},
         )
@@ -220,3 +220,14 @@ class ModelManager(object):
             if os.path.exists(job_result['workdir']):
                 shutil.rmtree(job_result['workdir'], ignore_errors=True)
         self._redis.delete(self.get_tasks_key(project), job_results_key)
+
+    def duplicate_model(self, project_src, project_dst):
+        latest_job_result = self._get_latest_job_result(project_src)
+        if latest_job_result is None:
+            raise FileNotFoundError(
+                f'You are trying to copy resources for project {project_src}, but latest job results are not found'
+            )
+
+        self._redis.rpush(self.get_job_results_key(project_dst), json.dumps(latest_job_result))
+        logger.info(f'Found latest job results with model version={latest_job_result["version"]}: '
+                    f'copying it from project {project_src} to project {project_dst}')

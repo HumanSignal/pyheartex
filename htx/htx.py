@@ -93,7 +93,7 @@ def _job_status():
     job = data['job']
     logger.info(f'Request: job status for {job}')
     response = _model_manager.job_status(job)
-    return jsonify(response)
+    return jsonify(response or {})
 
 
 @_server.route('/delete', methods=['POST'])
@@ -101,8 +101,17 @@ def _delete():
     data = json.loads(request.data)
     project = data['project']
     logger.info(f'Request: delete project {project}')
-    _model_manager.delete(project)
-    return jsonify({})
+    result = _model_manager.delete(project)
+    return jsonify(result or {})
+
+
+@_server.route('/duplicate_model', methods=['POST'])
+def _duplicate_model():
+    data = json.loads(request.data)
+    project_src = data['project_src']
+    project_dst = data['project_dst']
+    result = _model_manager.duplicate_model(project_src, project_dst)
+    return jsonify(result or {})
 
 
 @_server.errorhandler(NoSuchJobError)
