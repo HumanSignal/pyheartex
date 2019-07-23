@@ -221,6 +221,7 @@ class ModelManager(object):
             j = json.loads(job_result)
             if os.path.exists(j['workdir']):
                 shutil.rmtree(j['workdir'], ignore_errors=True)
+        shutil.rmtree(os.path.join(self.model_dir, project))
         self._redis.delete(self.get_tasks_key(project), job_results_key)
 
     def duplicate_model(self, project_src, project_dst):
