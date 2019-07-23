@@ -159,6 +159,7 @@ class ModelManager(object):
             version = job_result['version']
             self._current_model[project] = ModelWrapper(model, version)
             logger.info(f'Model {version} is initialized for project {project} in lazy mode.')
+            model_version = version
 
         m = self._current_model[project]
         data_items = []
@@ -217,8 +218,9 @@ class ModelManager(object):
         self._remove_jobs(project)
         job_results_key = self.get_job_results_key(project)
         for job_result in self._redis.lrange(job_results_key, 0, -1):
-            if os.path.exists(job_result['workdir']):
-                shutil.rmtree(job_result['workdir'], ignore_errors=True)
+            j = json.loads(job_result)
+            if os.path.exists(j['workdir']):
+                shutil.rmtree(j['workdir'], ignore_errors=True)
         self._redis.delete(self.get_tasks_key(project), job_results_key)
 
     def duplicate_model(self, project_src, project_dst):
