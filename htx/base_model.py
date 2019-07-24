@@ -202,6 +202,7 @@ class SingleChoiceBaseModel(BaseModel):
                 'result': [{
                     'from_name': output_name,
                     'to_name': input_name,
+                    'type': CHOICES_TYPE.lower(),
                     'value': {'choices': choices}
                 }],
                 'score': score,
@@ -247,6 +248,7 @@ class SingleLabelsBaseModel(BaseModel):
                 result.append({
                     'from_name': output_name,
                     'to_name': input_name,
+                    'type': LABELS_TYPE.lower(),
                     'value': {
                         'labels': [span['label']],
                         'start': span['start'],
@@ -294,6 +296,7 @@ class BoundingBoxBaseModel(BaseModel):
                 result.append({
                     'from_name': output_name,
                     'to_name': input_name,
+                    'type': BOUNDING_BOX_TYPE.lower(),
                     'value': {
                         'rectanglelabels': [bbox['label']],
                         'x': bbox['x'],
@@ -338,6 +341,7 @@ class ListBaseModel(BaseModel):
                 'result': [{
                     'from_name': output_name,
                     'to_name': input_name,
+                    'type': LIST_TYPE.lower(),
                     'value': {
                         'weights': scores,
                         'selected': [0] * len(scores),
