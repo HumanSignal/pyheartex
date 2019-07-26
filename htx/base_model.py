@@ -1,13 +1,10 @@
 import logging
 import json
 import attr
-import xmljson
 import numpy as np
+import xml.etree.ElementTree
 
-from lxml import etree
 from abc import ABC, abstractmethod
-from itertools import product
-from operator import itemgetter
 from collections import Iterable
 
 logger = logging.getLogger(__name__)
@@ -69,127 +66,40 @@ class BaseModel(ABC):
         pass
 
     @classmethod
-    def _parse_config_to_json(cls, config_string):
-        parser = etree.XMLParser(recover=False)
-        xml = etree.fromstring(config_string, parser)
-        if xml is None:
-            return None
-        config = xmljson.badgerfish.data(xml)
-        return config.get('View')
-
-    @classmethod
     def get_valid_schemas(cls, config_string):
-        config = cls._parse_config_to_json(config_string)
 
-        def _iter_tagvalue(tagvalue):
-            if isinstance(tagvalue, list):
-                for t in tagvalue:
-                    yield t
-            else:
-                yield tagvalue
+        def _is_input_tag(tag):
+            return tag.attrib.get('name') and tag.attrib.get('value', '').startswith('$')
 
-        name_tag_map = {}
-        for tag, value in config.items():
-            for tagvalue in _iter_tagvalue(value):
-                if '@name' not in tagvalue or '@value' not in tagvalue:
-                    # non-data tags are ignored
-                    continue
-                name_tag_map[tagvalue['@name']] = {
-                    'value': tagvalue['@value'],
-                    'type': tag
-                }
+        def _is_output_tag(tag):
+            return tag.attrib.get('name') and tag.attrib.get('toName')
 
-        def _get_inputs(output_tag):
-            input_names, input_values, input_types = [], [], []
-            for to_name in output_tag['@toName'].split(','):
-                input_type = name_tag_map[to_name]['type']
-                input_value = name_tag_map[to_name]['value'].lstrip('$')
-                if cls.INPUT_TYPES is None or input_type in cls.INPUT_TYPES:
-                    input_names.append(to_name)
-                    input_values.append(input_value)
-                    input_types.append(input_type)
-            return input_names, input_values, input_types
+        xml_tree = xml.etree.ElementTree.fromstring(config_string)
+
+        input_tags, output_tags = {}, {}
+        for tag in xml_tree.iter():
+            if _is_input_tag(tag):
+                input_tags[tag.attrib['name']] = {'type': tag.tag, 'value': tag.attrib['value'].lstrip('$')}
+            elif _is_output_tag(tag):
+                output_tags[tag.attrib['name']] = {'type': tag.tag, 'to_name': tag.attrib['toName'].split(',')}
 
         schemas = []
-        for output_type in cls.OUTPUT_TYPES:
-            if output_type not in config:
+        for output_name, output in output_tags.items():
+            if output['type'] not in cls.OUTPUT_TYPES:
                 continue
-            for tagvalue in _iter_tagvalue(config[output_type]):
-                input_names, input_values, input_types = _get_inputs(tagvalue)
-                if len(input_names):
-                    schema = {
-                        'output_names': [tagvalue['@name']],
-                        'input_names': input_names,
-                        'input_values': input_values,
-                        'input_types': input_types
-                    }
-                    schemas.append(schema)
-                    logger.debug(f'{cls.__class__.__name__} founds valid schema={schema} for config={config}')
+            input_names = output['to_name']
+            input_types = [input_tags[name]['type'] for name in input_names]
+            if cls.INPUT_TYPES is None or all(i in cls.INPUT_TYPES for i in input_types):
+                input_values = [input_tags[name]['value'] for name in input_names]
+                schema = {
+                    'output_names': [output_name],
+                    'input_names': input_names,
+                    'input_values': input_values,
+                    'input_types': input_types
+                }
+                schemas.append(schema)
+                logger.debug(f'{cls.__class__.__name__} founds valid schema={schema} for config={config_string}')
         return schemas
-
-    # @classmethod
-    # def get_valid_schemas(cls, config_string):
-    #
-    #     config = cls._parse_config_to_json(config_string)
-    #     if not config:
-    #         logger.warning(f'Cannot parse config string {config_string}.')
-    #         return []
-    #
-    #     if not (all(i in config for i in cls.INPUT_TYPES) and all(o in config for o in cls.OUTPUT_TYPES)):
-    #         # TODO: enhance log: currently is "INFO:htx.base_model:ABCMeta has no valid schemas..."
-    #         logger.info(f'{cls.__class__.__name__} has no valid schemas for config {config}')
-    #         return []
-    #
-    #     valid_inputs = []
-    #     valid_input_names_found = set()
-    #     for input_type in cls.INPUT_TYPES:
-    #         valid_inputs_of_type = []
-    #         tagvalue = config[input_type]
-    #         if isinstance(tagvalue, list):
-    #             for tagvalue_ in tagvalue:
-    #                 valid_inputs_of_type.append(
-    #                     {'type': input_type, 'name': tagvalue_['@name'], 'value': tagvalue_['@value'].lstrip('$')})
-    #                 valid_input_names_found.add(tagvalue_['@name'])
-    #         else:
-    #             valid_inputs_of_type.append(
-    #                 {'type': input_type, 'name': tagvalue['@name'], 'value': tagvalue['@value'].lstrip('$')})
-    #             valid_input_names_found.add(tagvalue['@name'])
-    #         valid_inputs.append(valid_inputs_of_type)
-    #
-    #     def _output_tag_is_applicable(tagvalue):
-    #         # TODO: not sure this is correct way to check input->output bindings
-    #         toNames = tagvalue['@toName'].split('+')
-    #         if set(toNames).issubset(valid_input_names_found) and len(toNames) == len(cls.INPUT_TYPES):
-    #             return True
-    #         return False
-    #
-    #     valid_outputs = []
-    #     for output_type in cls.OUTPUT_TYPES:
-    #         valid_outputs_of_type = []
-    #         tagvalue = config[output_type]
-    #         if isinstance(tagvalue, list):
-    #             for tagvalue_ in tagvalue:
-    #                 if not _output_tag_is_applicable(tagvalue_):
-    #                     continue
-    #                 valid_outputs_of_type.append({'type': output_type, 'name': tagvalue_['@name']})
-    #         else:
-    #             if not _output_tag_is_applicable(tagvalue):
-    #                 continue
-    #             valid_outputs_of_type.append({'type': output_type, 'name': tagvalue['@name']})
-    #         valid_outputs.append(valid_outputs_of_type)
-    #
-    #     schemas = []
-    #     for valid_inputs_prod in product(*valid_inputs):
-    #         for valid_outputs_prod in product(*valid_outputs):
-    #             schema = {
-    #                 'input_names': list(map(itemgetter('name'), valid_inputs_prod)),
-    #                 'output_names': list(map(itemgetter('name'), valid_outputs_prod)),
-    #                 'input_values': list(map(itemgetter('value'), valid_inputs_prod))
-    #             }
-    #             logger.debug(f'{cls.__class__.__name__} founds valid schema={schema} for config={config}')
-    #             schemas.append(schema)
-    #
-    #     return schemas
 
     def get_data_item(self, task):
         meta = task.get('meta')
