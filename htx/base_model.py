@@ -21,11 +21,14 @@ CHOICES_TYPE = 'Choices'
 LABELS_TYPE = 'Labels'
 BOUNDING_BOX_TYPE = 'RectangleLabels'
 LIST_TYPE = 'Ranker'
+TEXT_AREA_TYPE = 'TextArea'
 
 
 @attr.s
 class DataItem(object):
     input = attr.ib()
+    input_types = attr.ib(default=None)
+    input_names = attr.ib(default=None)
     id = attr.ib(default=None)
     output = attr.ib(default=None)
     meta = attr.ib(default=None)
@@ -47,8 +50,9 @@ class BaseModel(ABC):
     INPUT_TYPES = None
     OUTPUT_TYPES = None
 
-    def __init__(self, input_names=None, output_names=None, input_values=None):
+    def __init__(self, input_names=None, output_names=None, input_values=None, input_types=None):
         self.input_names = input_names
+        self.input_types = input_types
         self.output_names = output_names
         self.input_values = input_values
 
@@ -58,7 +62,6 @@ class BaseModel(ABC):
     def get_input(self, task):
         if 'data' not in task:
             return None
-
         return [task['data'].get(input_value) for input_value in self.input_values]
 
     @abstractmethod
@@ -76,82 +79,140 @@ class BaseModel(ABC):
 
     @classmethod
     def get_valid_schemas(cls, config_string):
-
         config = cls._parse_config_to_json(config_string)
-        if not config:
-            logger.warning(f'Cannot parse config string {config_string}.')
-            return []
 
-        if not (all(i in config for i in cls.INPUT_TYPES) and all(o in config for o in cls.OUTPUT_TYPES)):
-            # TODO: enhance log: currently is "INFO:htx.base_model:ABCMeta has no valid schemas..."
-            logger.info(f'{cls.__class__.__name__} has no valid schemas for config {config}')
-            return []
-
-        valid_inputs = []
-        valid_input_names_found = set()
-        for input_type in cls.INPUT_TYPES:
-            valid_inputs_of_type = []
-            tagvalue = config[input_type]
+        def _iter_tagvalue(tagvalue):
             if isinstance(tagvalue, list):
-                for tagvalue_ in tagvalue:
-                    valid_inputs_of_type.append(
-                        {'type': input_type, 'name': tagvalue_['@name'], 'value': tagvalue_['@value'].lstrip('$')})
-                    valid_input_names_found.add(tagvalue_['@name'])
+                for t in tagvalue:
+                    yield t
             else:
-                valid_inputs_of_type.append(
-                    {'type': input_type, 'name': tagvalue['@name'], 'value': tagvalue['@value'].lstrip('$')})
-                valid_input_names_found.add(tagvalue['@name'])
-            valid_inputs.append(valid_inputs_of_type)
+                yield tagvalue
 
-        def _output_tag_is_applicable(tagvalue):
-            # TODO: not sure this is correct way to check input->output bindings
-            toNames = tagvalue['@toName'].split('+')
-            if set(toNames).issubset(valid_input_names_found) and len(toNames) == len(cls.INPUT_TYPES):
-                return True
-            return False
-
-        valid_outputs = []
-        for output_type in cls.OUTPUT_TYPES:
-            valid_outputs_of_type = []
-            tagvalue = config[output_type]
-            if isinstance(tagvalue, list):
-                for tagvalue_ in tagvalue:
-                    if not _output_tag_is_applicable(tagvalue_):
-                        continue
-                    valid_outputs_of_type.append({'type': output_type, 'name': tagvalue_['@name']})
-            else:
-                if not _output_tag_is_applicable(tagvalue):
+        name_tag_map = {}
+        for tag, value in config.items():
+            for tagvalue in _iter_tagvalue(value):
+                if '@name' not in tagvalue or '@value' not in tagvalue:
+                    # non-data tags are ignored
                     continue
-                valid_outputs_of_type.append({'type': output_type, 'name': tagvalue['@name']})
-            valid_outputs.append(valid_outputs_of_type)
+                name_tag_map[tagvalue['@name']] = {
+                    'value': tagvalue['@value'],
+                    'type': tag
+                }
+
+        def _get_inputs(output_tag):
+            input_names, input_values, input_types = [], [], []
+            for to_name in output_tag['@toName'].split(','):
+                input_type = name_tag_map[to_name]['type']
+                input_value = name_tag_map[to_name]['value'].lstrip('$')
+                if cls.INPUT_TYPES is None or input_type in cls.INPUT_TYPES:
+                    input_names.append(to_name)
+                    input_values.append(input_value)
+                    input_types.append(input_type)
+            return input_names, input_values, input_types
 
         schemas = []
-        for valid_inputs_prod in product(*valid_inputs):
-            for valid_outputs_prod in product(*valid_outputs):
-                schema = {
-                    'input_names': list(map(itemgetter('name'), valid_inputs_prod)),
-                    'output_names': list(map(itemgetter('name'), valid_outputs_prod)),
-                    'input_values': list(map(itemgetter('value'), valid_inputs_prod))
-                }
-                logger.debug(f'{cls.__class__.__name__} founds valid schema={schema} for config={config}')
-                schemas.append(schema)
-
+        for output_type in cls.OUTPUT_TYPES:
+            if output_type not in config:
+                continue
+            for tagvalue in _iter_tagvalue(config[output_type]):
+                input_names, input_values, input_types = _get_inputs(tagvalue)
+                if len(input_names):
+                    schema = {
+                        'output_names': [tagvalue['@name']],
+                        'input_names': input_names,
+                        'input_values': input_values,
+                        'input_types': input_types
+                    }
+                    schemas.append(schema)
+                    logger.debug(f'{cls.__class__.__name__} founds valid schema={schema} for config={config}')
         return schemas
+
+    # @classmethod
+    # def get_valid_schemas(cls, config_string):
+    #
+    #     config = cls._parse_config_to_json(config_string)
+    #     if not config:
+    #         logger.warning(f'Cannot parse config string {config_string}.')
+    #         return []
+    #
+    #     if not (all(i in config for i in cls.INPUT_TYPES) and all(o in config for o in cls.OUTPUT_TYPES)):
+    #         # TODO: enhance log: currently is "INFO:htx.base_model:ABCMeta has no valid schemas..."
+    #         logger.info(f'{cls.__class__.__name__} has no valid schemas for config {config}')
+    #         return []
+    #
+    #     valid_inputs = []
+    #     valid_input_names_found = set()
+    #     for input_type in cls.INPUT_TYPES:
+    #         valid_inputs_of_type = []
+    #         tagvalue = config[input_type]
+    #         if isinstance(tagvalue, list):
+    #             for tagvalue_ in tagvalue:
+    #                 valid_inputs_of_type.append(
+    #                     {'type': input_type, 'name': tagvalue_['@name'], 'value': tagvalue_['@value'].lstrip('$')})
+    #                 valid_input_names_found.add(tagvalue_['@name'])
+    #         else:
+    #             valid_inputs_of_type.append(
+    #                 {'type': input_type, 'name': tagvalue['@name'], 'value': tagvalue['@value'].lstrip('$')})
+    #             valid_input_names_found.add(tagvalue['@name'])
+    #         valid_inputs.append(valid_inputs_of_type)
+    #
+    #     def _output_tag_is_applicable(tagvalue):
+    #         # TODO: not sure this is correct way to check input->output bindings
+    #         toNames = tagvalue['@toName'].split('+')
+    #         if set(toNames).issubset(valid_input_names_found) and len(toNames) == len(cls.INPUT_TYPES):
+    #             return True
+    #         return False
+    #
+    #     valid_outputs = []
+    #     for output_type in cls.OUTPUT_TYPES:
+    #         valid_outputs_of_type = []
+    #         tagvalue = config[output_type]
+    #         if isinstance(tagvalue, list):
+    #             for tagvalue_ in tagvalue:
+    #                 if not _output_tag_is_applicable(tagvalue_):
+    #                     continue
+    #                 valid_outputs_of_type.append({'type': output_type, 'name': tagvalue_['@name']})
+    #         else:
+    #             if not _output_tag_is_applicable(tagvalue):
+    #                 continue
+    #             valid_outputs_of_type.append({'type': output_type, 'name': tagvalue['@name']})
+    #         valid_outputs.append(valid_outputs_of_type)
+    #
+    #     schemas = []
+    #     for valid_inputs_prod in product(*valid_inputs):
+    #         for valid_outputs_prod in product(*valid_outputs):
+    #             schema = {
+    #                 'input_names': list(map(itemgetter('name'), valid_inputs_prod)),
+    #                 'output_names': list(map(itemgetter('name'), valid_outputs_prod)),
+    #                 'input_values': list(map(itemgetter('value'), valid_inputs_prod))
+    #             }
+    #             logger.debug(f'{cls.__class__.__name__} founds valid schema={schema} for config={config}')
+    #             schemas.append(schema)
+    #
+    #     return schemas
 
     def get_data_item(self, task):
         meta = task.get('meta')
         id = task.get('id')
         try:
             task_input = self.get_input(task)
+            task_input_types = self.input_types
+            task_input_names = self.input_names
         except Exception as e:
             logger.error(f'Cannot parse task input from {task}. Reason: {e}')
-            return DataItem(input=None, output=None, id=id, meta=meta)
+            return DataItem(input=None, input_types=None, input_names=None, output=None, id=id, meta=meta)
         try:
             task_output = self.get_output(task)
         except Exception as e:
             logger.error(f'Cannot parse task output from {task}. Reason: {e}', exc_info=True)
-            return DataItem(input=task_input, output=None, id=id, meta=meta)
-        return DataItem(input=task_input, output=task_output, meta=meta, id=id)
+            return DataItem(
+                input=task_input, input_types=task_input_types, input_names=task_input_names, output=None, id=id,
+                meta=meta
+            )
+        return DataItem(
+            input=task_input, input_types=task_input_types, input_names=task_input_names, output=task_output, meta=meta,
+            id=id
+        )
 
     @abstractmethod
     def predict(self, tasks):
