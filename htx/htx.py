@@ -116,9 +116,11 @@ def _duplicate_model():
 
 @_server.errorhandler(NoSuchJobError)
 def no_such_job_error_handler(error):
+    logger.warning(f'Got error: {str(error)}')
     return str(error), 410
 
 
 @_server.errorhandler(FileNotFoundError)
 def file_not_found_error_handler(error):
+    logger.warning(f'Got error: {str(error)}')
     return str(error), 404
