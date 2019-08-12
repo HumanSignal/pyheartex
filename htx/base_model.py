@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 # Input types
 TEXT_TYPE = 'Text'
 IMAGE_TYPE = 'Image'
+AUDIO_TYPE = 'Audio'
 
 # Output types
 CHOICES_TYPE = 'Choices'
@@ -335,6 +336,10 @@ class TextTagger(SingleLabelsBaseModel):
 
 class SingleClassImageClassifier(SingleChoiceBaseModel):
     INPUT_TYPES = (IMAGE_TYPE,)
+
+
+class SingleClassAudioClassifier(SingleChoiceBaseModel):
+    INPUT_TYPES = (AUDIO_TYPE,)
 
 
 class SingleClassImageAndTextClassifier(SingleChoiceBaseModel):
