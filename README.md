@@ -4,6 +4,9 @@ Python interface for running ML backend server and using it for active learning 
 
 # Installation
 
+First make sure you have [Redis server](https://redis.io/topics/quickstart) running (otherwise you can use only prediction, not active learning).
+
+Install Heartex SDK:
 ```bash
 git clone https://github.com/heartexlabs/pyheartex.git
 cd pyheartex/
@@ -11,59 +14,80 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+Last thing you should do is to start RQ workers in the background:
+```bash
+rq worker default
+```
+
 # Quick start
+Let's serve [scikit-learn](https://scikit-learn.org/stable/) model for text classification.
 
-Assume you want to build a prediction service that classifies short texts onto two classes (e.g., positive/negative).
-
-First thing you need to create a new project on [Heartex](go.heartex.net) (read [docs](http://go.heartex.net/static/docs/#/Business?id=create-new-project) for a detailed explanation of how to create a project).
-
-### Step 1
-
-Use the following config when create a project:
-```html
-<View>
-  <Text name="txt-1" value="$my_text"></Text>
-  <Choices name="pos-neg" toName="txt-1">
-    <Choice value="positive"></Choice>
-    <Choice value="negative"></Choice>
-  </Choices>
-</View>
-```
-
-### Step 2
-
-Upload JSON file:
-```json
-[
-  {"my_text": "It was great"},
-  {"my_text": "Terrible, terible movie"}
-]
-```
-
-### Step 3 
-
-Start model server running a text classifier
-
+You can simply launch
 ```bash
-cd examples/
-virtualenv -p python3 env && source env/bin/activate
-pip install -r examples-requirements.txt
-python run.py --host localhost --port 8999 --debug
+python examples/quickstart.py
 ```
 
-### Step 4
+This script looks like
+```python
+from htx.adapters.sklearn import serve
 
-Configure your project settings to make use of the above model. Go into project settings, Machine Learning tag, click Add  Custom Model and input model name (whatever you like) and it's URL. If you've started it with the above script, it should be accessible through HTTP on port 8999 and your IP. For example, mine is running on http://12.248.117.34:8999
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
 
-### Step 5
 
-Label above examples through the Heartex interface
+if __name__ == "__main__":
 
-### Step 6
+    # Creating sklearn-compatible model
+    my_model = make_pipeline(TfidfVectorizer(), LogisticRegression())
 
-Now you can send prediction request by using `TOKEN` and `PROJECT-ID` acquired [via Heartex](https://go.heartex.net/):
+    # Start serving this model
+    serve(my_model)
+``` 
+
+It starts serving at http://localhost:16118 listening for Heartex event. 
+To connect your model, go to Heartex -> Settings -> Machine learning page and choose "Add custom model".
+
+Or you can use Heartex API to activate your model:
 ```bash
-curl -X POST -H "Content-Type: application/json" -H "Authorization: Token <TOKEN>" \
--d '[{"my_text": "great, great!"}]' \
-https://go.heartex.net/api/projects/<PROJECT-ID>/predict/
+curl -X POST -H 'Content-Type: application/json' \
+-H 'Authorization: Token <PUT-YOUR-TOKEN-HERE>' \
+-d '[{"url": "http://localhost:16118", "name": "my_model", "title": "My model", "description": "My new model deployed on Heartex"}]' \
+http://go.heartex.net/api/projects/{project-id}/backends/
+```
+
+# Advanced usage
+When you want to go beyond using sklearn compatible API, you can build your own model, by making manually input/output interface conversion.
+You have to subclass Heartex models as follows:
+```python
+from htx.base_model import BaseModel
+
+# This class exposes methods needed to handle model in the runtime (loading into memory, running predictions)
+class MyModel(BaseModel):
+
+    def get_input(self, task):
+        """Extract input from serialized task"""
+        pass
+    
+    def get_output(self, task):
+        """Extract output from serialized task"""
+        pass
+        
+    def load(self, train_output):
+        """Loads model into memory. `train_output` dict is actually the output the `train` method (see below)"""
+        pass
+        
+    def predict(self, tasks):
+        """Get list of tasks, already processed by `get_input` method, and returns completions in Heartex format"""
+        pass
+        
+# This method handles model retraining
+def train(input_tasks, output_model_dir, **kwargs):
+    """
+    :param input_tasks: list of tasks already processed by `get_input`
+    :param output_model_dir: output directory where you can optionally store model resources
+    :param kwargs: any additional kwargs taken from `train_kwargs`
+    :return: `train_output` dict for consequent model loading
+    """
+    pass
 ```
