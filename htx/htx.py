@@ -1,9 +1,11 @@
+import os
 import json
 import logging
 
-
+from flask import request
 from flask import Flask, request, jsonify
 from rq.exceptions import NoSuchJobError
+from functools import wraps
 
 from htx.model_manager import ModelManager
 
@@ -11,6 +13,9 @@ from htx.model_manager import ModelManager
 _server = Flask('htx.server')
 logger = logging.getLogger(__name__)
 _model_manager = None
+LOG_DIR = '/tmp'
+USERNAME = 'heartex'
+PASSWORD = 'heartex'
 
 
 def init_model_server(**kwargs):
@@ -124,3 +129,22 @@ def no_such_job_error_handler(error):
 def file_not_found_error_handler(error):
     logger.warning(f'Got error: {str(error)}')
     return str(error), 404
+
+
+def login_required(f):
+    @wraps(f)
+    def wrapped_view(**kwargs):
+        auth = request.authorization
+        if not (auth and auth.username == USERNAME and auth.password == PASSWORD):
+            return ('Unauthorized', 401,
+                    {'WWW-Authenticate': 'Basic realm="Login Required"'})
+        return f(**kwargs)
+    return wrapped_view
+
+
+@_server.route('/logs/<path:path>')
+@login_required
+def send_log(path):
+    """ Log access via web """
+    logfile = os.path.join(LOG_DIR, path)
+    return _server.send_file(logfile, mimetype='text/plain', as_attachment=False)
