@@ -2,8 +2,7 @@ import os
 import json
 import logging
 
-from flask import request
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from rq.exceptions import NoSuchJobError
 from functools import wraps
 
@@ -147,4 +146,4 @@ def login_required(f):
 def send_log(path):
     """ Log access via web """
     logfile = os.path.join(LOG_DIR, path)
-    return _server.send_file(logfile, mimetype='text/plain', as_attachment=False)
+    return send_file(logfile, mimetype='text/plain', as_attachment=False)
