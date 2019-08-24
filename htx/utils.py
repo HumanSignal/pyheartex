@@ -3,6 +3,8 @@ import io
 import logging
 import json
 import os
+import hashlib
+import requests
 
 from glob import glob
 from datetime import datetime
@@ -32,3 +34,14 @@ def iter_input_data_dir(data_dir):
 
 def generate_version():
     return str(int(datetime.now().timestamp()))
+
+
+def download(url, output_dir, filename=None):
+    if filename is None:
+        filename = hashlib.md5(url.encode()).hexdigest()
+    filepath = os.path.join(output_dir, filename)
+    r = requests.get(url)
+    r.raise_for_status()
+    with io.open(filepath, mode='wb') as fout:
+        fout.write(r.content)
+    return filepath
