@@ -3,8 +3,7 @@ import io
 import requests
 from PIL import Image
 
-from pathlib import Path
-from fastai.vision import ImageDataBunch, get_transforms, models, cnn_learner, accuracy, load_learner, open_image
+from fastai.vision import load_learner, open_image
 from htx.base_model import SingleClassImageClassifier
 from htx.utils import download
 from htx import init_model_server, app
@@ -23,7 +22,7 @@ class FastaiImageClassifier(SingleClassImageClassifier):
         with io.BytesIO(r.content) as f:
             return Image.open(f).convert('RGB')
 
-    def predict(self, tasks):
+    def predict(self, tasks, **kwargs):
         pred_labels, pred_scores = [], []
         for task in tasks:
             image_file = download(task['input'][0], self._image_dir)
@@ -35,7 +34,7 @@ class FastaiImageClassifier(SingleClassImageClassifier):
         return self.make_results(tasks, pred_labels, pred_scores)
 
 
-def fit_fastai_image_classifier(input_data, output_dir, image_dir, **kwargs):
+def fit_fastai_image_classifier(input_data, output_dir, image_dir, learner_script, **kwargs):
     filenames, labels = [], []
     for item in input_data:
         if item['output'] is None:
@@ -44,28 +43,24 @@ def fit_fastai_image_classifier(input_data, output_dir, image_dir, **kwargs):
         image_path = download(image_url, image_dir)
         filenames.append(image_path)
         labels.append(item['output'][0])
-
-    tfms = get_transforms()
-    data = ImageDataBunch.from_lists(
-        Path(image_dir), filenames, labels=labels, ds_tfms=tfms, size=224, bs=4)
-    learn = cnn_learner(data, models.resnet18, metrics=accuracy, path=output_dir)
-    learn.fit(10)
+    learn = learner_script(image_dir, filenames, labels, output_dir)
     learn.export()
     return {'model_path': output_dir, 'image_dir': image_dir}
 
 
-def serve(port=16118, debug=True, **fit_kwargs):
+def serve(learner_script, port=16118, debug=True, image_dir='~/.heartex/images', num_iter=10, **fit_kwargs):
     """
-    :param model: Sklearn-compatible model, that is pickleable and has interface for .fit(X, y) and .predict_proba(X)
+    :param learner_script: function that takes (DataBunch, str) as input and returns Learner object
     :param port: specify localhost port where the model will be served
     :param debug: whether to start at debug mode
     :return:
     """
-    from fast_ai import fit_fastai_image_classifier
     init_model_server(
         create_model_func=FastaiImageClassifier,
         train_script=fit_fastai_image_classifier,
-        image_dir='/mnt/big/images',
+        learner_script=learner_script,
+        num_iter=num_iter,
+        image_dir=image_dir,
         redis_queue=os.environ.get('RQ_QUEUE_NAME', 'default'),
         redis_host=os.environ.get('REDIS_HOST', 'localhost'),
         redis_port=os.environ.get('REDIS_HOST', 6379),
