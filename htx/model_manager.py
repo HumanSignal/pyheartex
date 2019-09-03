@@ -137,7 +137,7 @@ class ModelManager(object):
             response['result'] = json.loads(job.result)
         return response
 
-    def predict(self, tasks, project, schema=None, model_version=None):
+    def predict(self, tasks, project, schema=None, model_version=None, **kwargs):
         if not hasattr(self, '_current_model'):
             # This ensures each subprocess loads its own copy of model to avoid pre-fork initializations
             self._current_model = {}
@@ -165,7 +165,7 @@ class ModelManager(object):
         data_items = []
         for task in tasks:
             data_items.append(attr.asdict(m.model.get_data_item(task)))
-        results = m.model.predict(data_items)
+        results = m.model.predict(data_items, **kwargs)
         return results, model_version
 
     @classmethod

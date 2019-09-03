@@ -29,9 +29,10 @@ def _predict():
     project = data['project']
     schema = data.get('schema')
     model_version = data.get('model_version')
+    params = data.get('params', {})
 
     logger.info(f'Request: predict {len(tasks)} tasks for project {project}')
-    results, model_version = _model_manager.predict(tasks, project, schema, model_version)
+    results, model_version = _model_manager.predict(tasks, project, schema, model_version, **params)
     response = {
         'results': results,
         'model_version': model_version

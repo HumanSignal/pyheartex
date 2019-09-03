@@ -126,7 +126,7 @@ class BaseModel(ABC):
         )
 
     @abstractmethod
-    def predict(self, tasks):
+    def predict(self, tasks, **kwargs):
         pass
 
     @abstractmethod
