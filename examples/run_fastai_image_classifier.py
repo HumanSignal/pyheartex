@@ -4,6 +4,14 @@ from fastai.vision import ImageDataBunch, get_transforms, models, cnn_learner, a
 
 
 def fastai_image_classifier(image_dir, filenames, labels, output_dir):
+    """
+    This script provides FastAI-compatible training for the input labeled images
+    :param image_dir: directory with images
+    :param filenames: image filenames
+    :param labels: image labels
+    :param output_dir: output directory where results will be exported
+    :return: fastai.basic_train.Learner object
+    """
     tfms = get_transforms()
     data = ImageDataBunch.from_lists(
         Path(image_dir),

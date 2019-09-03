@@ -20,6 +20,13 @@ rq worker default
 ```
 
 # Quick start
+
+Quick start guide provides the usage of the following popular machine learning frameworks within Heartex platform:
+- [scikit-learn](#scikit-learn)
+- [FastAI](#fastai)
+
+
+## Scikit-learn
 Let's serve [scikit-learn](https://scikit-learn.org/stable/) model for text classification.
 
 You can simply launch
@@ -55,6 +62,10 @@ curl -X POST -H 'Content-Type: application/json' \
 -d '[{"url": "http://localhost:16118", "name": "my_model", "title": "My model", "description": "My new model deployed on Heartex"}]' \
 http://go.heartex.net/api/projects/{project-id}/backends/
 ```
+
+## FastAI
+You can integrate [FastAI](https://docs.fast.ai/) models similarly to scikit-learn.
+Check [this example](examples/run_fastai_image_classifier.py) to learn how to plug in updateable image classifier.
 
 # Advanced usage
 When you want to go beyond using sklearn compatible API, you can build your own model, by making manually input/output interface conversion.
