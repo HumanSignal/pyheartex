@@ -1,3 +1,5 @@
+import os
+
 from htx.adapters.fast_ai import serve
 from pathlib import Path
 from fastai.vision import ImageDataBunch, get_transforms, models, cnn_learner, accuracy
@@ -28,4 +30,4 @@ def fastai_image_classifier(image_dir, filenames, labels, output_dir):
 
 if __name__ == "__main__":
     from run_fastai_image_classifier import fastai_image_classifier
-    serve(learner_script=fastai_image_classifier, port=16118)
+    serve(learner_script=fastai_image_classifier, port=int(os.getenv('PORT', 16118)))
