@@ -67,4 +67,4 @@ def serve(learner_script, port=16118, debug=True, image_dir='~/.heartex/images',
         **fit_kwargs
     )
 
-    app.run(host='localhost', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=port, debug=debug)
