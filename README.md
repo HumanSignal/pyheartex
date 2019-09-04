@@ -59,9 +59,10 @@ Or you can use Heartex API to activate your model:
 ```bash
 curl -X POST -H 'Content-Type: application/json' \
 -H 'Authorization: Token <PUT-YOUR-TOKEN-HERE>' \
--d '[{"url": "http://localhost:16118", "name": "my_model", "title": "My model", "description": "My new model deployed on Heartex"}]' \
+-d '[{"url": "$HOST:$PORT", "name": "my_model", "title": "My model", "description": "My new model deployed on Heartex"}]' \
 http://go.heartex.net/api/projects/{project-id}/backends/
 ```
+where `$HOST:$PORT` is your server URL that should be accessible from the outside.
 
 ## FastAI
 You can integrate [FastAI](https://docs.fast.ai/) models similarly to scikit-learn.
