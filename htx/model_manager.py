@@ -207,7 +207,7 @@ class ModelManager(object):
         model = self.create_model_func(**schema)
         tasks_key = self.get_tasks_key(project)
         self._redis.delete(tasks_key)
-        self._remove_jobs(project)
+        # self._remove_jobs(project)
         for task in tasks:
             data_item = model.get_data_item(task)
             self._redis.rpush(tasks_key, data_item.serialize())
