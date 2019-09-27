@@ -4,3 +4,4 @@ rq==1.0
 numpy==1.16.3
 scikit-learn==0.21.3
 fastai==1.0.57
+requests==2.21.0
