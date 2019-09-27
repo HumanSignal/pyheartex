@@ -1,3 +1,4 @@
+import io
 import os
 import json
 import logging
@@ -147,4 +148,13 @@ def login_required(f):
 def send_log(path):
     """ Log access via web """
     logfile = os.path.join(LOG_DIR, path)
-    return send_file(logfile, mimetype='text/plain', as_attachment=False)
+    if not logfile.startswith(os.path.abspath(LOG_DIR) + os.sep):
+        return 'Wrong path'
+
+    file = io.open(logfile, mode='r', encoding='utf-8', errors='ignore').read()
+    out = file[-1024 * 100:]  # read last 100 kB
+    out = out.replace('File "', 'File "<b>').replace('", line', '</b>", line')
+    out = out.replace('\n[', '\n\n[')
+
+    return out
+
