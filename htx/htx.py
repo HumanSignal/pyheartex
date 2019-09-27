@@ -156,5 +156,5 @@ def send_log(path):
     out = out.replace('File "', 'File "<b>').replace('", line', '</b>", line')
     out = out.replace('\n[', '\n\n[')
 
-    return out
+    return '<pre>' + out + '</pre>'
 
