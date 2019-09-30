@@ -274,7 +274,8 @@ class BoundingBoxBaseModel(BaseModel):
                         'x': bbox['x'],
                         'y': bbox['y'],
                         'height': bbox['height'],
-                        'width': bbox['width']
+                        'width': bbox['width'],
+                        'score': bbox.get('score')
                     }
                 })
             results.append({
