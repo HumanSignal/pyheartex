@@ -47,8 +47,9 @@ def _update():
     project = task.pop('project')
     schema = task.pop('schema')
     retrain = task.pop('retrain', False)
+    params = task.pop('params', {})
     logger.info(f'Update for project {project} with retrain={retrain}')
-    maybe_job = _model_manager.update(task, project, schema, retrain)
+    maybe_job = _model_manager.update(task, project, schema, retrain, params)
     response = {}
     if maybe_job:
         response['job'] = maybe_job.id
@@ -62,10 +63,11 @@ def _train():
     tasks = data['tasks']
     project = data['project']
     schema = data['schema']
+    params = data.get('params', {})
     if len(tasks) == 0:
         return jsonify({'status': 'error', 'message': 'No tasks found.'}), 400
     logger.info(f'Request: train for project {project} with {len(tasks)} tasks')
-    job = _model_manager.train(tasks, project, schema)
+    job = _model_manager.train(tasks, project, schema, params)
     response = {'job': job.id}
     return jsonify(response), 201
 

@@ -5,6 +5,7 @@ import attr
 import shutil
 import time
 
+from copy import deepcopy
 from redis import Redis
 from rq import Queue, get_current_job
 from rq.registry import StartedJobRegistry, FinishedJobRegistry
@@ -56,10 +57,12 @@ class ModelManager(object):
             logger.info(f'Deleting job_id {job_id}')
             job.delete()
 
-    def _start_training_job(self, project):
+    def _start_training_job(self, project, params):
+        train_kwargs = deepcopy(self.train_kwargs)
+        train_kwargs.update(params)
         job = self._redis_queue.enqueue(
             self.train_script_wrapper,
-            args=(self.train_script, self.redis_host, self.redis_port, self.model_dir, project, self.train_kwargs),
+            args=(self.train_script, self.redis_host, self.redis_port, self.model_dir, project, train_kwargs),
             job_timeout='365d',
             ttl=-1,
             result_ttl=-1,
@@ -194,16 +197,16 @@ class ModelManager(object):
         redis.rpush(cls.get_job_results_key(project), job_result)
         return job_result
 
-    def update(self, task, project, schema, retrain):
+    def update(self, task, project, schema, retrain, params):
         model = self.create_model_func(**schema)
         data_item = model.get_data_item(task)
 
         self._redis.rpush(self.get_tasks_key(project), data_item.serialize())
         if retrain:
-            job = self._start_training_job(project)
+            job = self._start_training_job(project, params)
             return job
 
-    def train(self, tasks, project, schema):
+    def train(self, tasks, project, schema, params):
         model = self.create_model_func(**schema)
         tasks_key = self.get_tasks_key(project)
         self._redis.delete(tasks_key)
@@ -211,7 +214,7 @@ class ModelManager(object):
         for task in tasks:
             data_item = model.get_data_item(task)
             self._redis.rpush(tasks_key, data_item.serialize())
-        job = self._start_training_job(project)
+        job = self._start_training_job(project, params)
         return job
 
     def delete(self, project):
