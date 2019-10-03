@@ -15,6 +15,6 @@ setup(
         'xmljson==0.2.0',
         'lxml==4.3.3',
         'rq==1.0',
-        'requests==2.21.0'
+        'requests==2.22.0'
     ],
 )
