@@ -60,7 +60,14 @@ class BaseModel(ABC):
     def get_input(self, task):
         if 'data' not in task:
             return None
-        return [task['data'].get(input_value) for input_value in self.input_values]
+        inputs = []
+        for input_value in self.input_values:
+            maybe_meta = task.get('meta', {}).get(input_value)
+            if maybe_meta:
+                inputs.append(maybe_meta)
+            else:
+                inputs.append(task['data'].get(input_value))
+        return inputs
 
     @abstractmethod
     def get_output(self, task):
