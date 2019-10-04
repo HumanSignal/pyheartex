@@ -18,6 +18,7 @@ AUDIO_TYPE = 'Audio'
 CHOICES_TYPE = 'Choices'
 LABELS_TYPE = 'Labels'
 BOUNDING_BOX_TYPE = 'RectangleLabels'
+POLYGON_TYPE = 'PolygonLabels'
 LIST_TYPE = 'Ranker'
 TEXT_AREA_TYPE = 'TextArea'
 
@@ -56,6 +57,7 @@ class BaseModel(ABC):
 
         self._model = None
         self._cluster = {}
+        self._neighbors = {}
 
     def get_input(self, task):
         if 'data' not in task:
@@ -293,6 +295,51 @@ class BoundingBoxBaseModel(BaseModel):
         return results
 
 
+class PolygonBaseModel(BaseModel):
+    OUTPUT_TYPES = (POLYGON_TYPE,)
+
+    def get_output(self, task):
+        if not isinstance(task.get('result'), Iterable):
+            return None
+        input_name = self.input_names[0]
+        labels_name = self.output_names[0]
+        output = []
+        for r in task['result']:
+            if r['from_name'] != labels_name or r['to_name'] != input_name:
+                continue
+            value = r['value']
+            output.append({
+                'points': value['points'],
+                'label': value['polygonlabels'][0]
+            })
+        return output
+
+    def make_result(self, tasks, list_of_polygons, scores):
+        results = []
+        input_name = self.input_names[0] if self.input_names else None
+        output_name = self.output_names[0] if self.output_names else None
+        for task, polygons, score in zip(tasks, list_of_polygons, scores):
+            result = []
+            for polygon in polygons:
+                result.append({
+                    'from_name': output_name,
+                    'to_name': input_name,
+                    'type': POLYGON_TYPE.lower(),
+                    'value': {
+                        'polygonlabels': [polygon['label']],
+                        'points': polygon['points'],
+                        'score': polygon.get('score')
+                    }
+                })
+            results.append({
+                'result': result,
+                'score': score,
+                'neighbors': self._neighbors.get(str(task['id'])),
+                'cluster': self._cluster.get(str(task['id']))
+            })
+        return results
+
+
 class ListBaseModel(BaseModel):
     OUTPUT_TYPES = (LIST_TYPE,)
 
@@ -355,4 +402,8 @@ class SingleClassImageAndTextClassifier(SingleChoiceBaseModel):
 
 
 class ImageObjectDetection(BoundingBoxBaseModel):
+    INPUT_TYPES = (IMAGE_TYPE,)
+
+
+class ImageSegmentation(PolygonBaseModel):
     INPUT_TYPES = (IMAGE_TYPE,)
