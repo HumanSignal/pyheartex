@@ -19,6 +19,14 @@ Last thing you should do is to start RQ workers in the background:
 rq worker default
 ```
 
+# Using Docker
+Here is an example how to start serving image classifier:
+```bash
+cd examples/docker
+docker-compose up
+```
+All you need to replace with your own model is to change loading, inference and training scripts from [this file](examples/docker/scripts/image_classifier.py).
+
 # Quick start
 
 Quick start guide provides the usage of the following popular machine learning frameworks within Heartex platform:
