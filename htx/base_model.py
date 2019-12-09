@@ -389,6 +389,10 @@ class TextTagger(SingleLabelsBaseModel):
     INPUT_TYPES = (TEXT_TYPE,)
 
 
+class AudioTagger(SingleLabelsBaseModel):
+    INPUT_TYPES = (AUDIO_TYPE, "AudioPlus")
+
+
 class SingleClassImageClassifier(SingleChoiceBaseModel):
     INPUT_TYPES = (IMAGE_TYPE,)
 
