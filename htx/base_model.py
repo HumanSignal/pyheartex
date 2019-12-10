@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 TEXT_TYPE = 'Text'
 IMAGE_TYPE = 'Image'
 AUDIO_TYPE = 'Audio'
+AUDIO_PLUS_TYPE = 'AudioPlus'
+HYPERTEXT_TYPE = 'HyperText'
 
 # Output types
 CHOICES_TYPE = 'Choices'
@@ -390,7 +392,7 @@ class TextTagger(SingleLabelsBaseModel):
 
 
 class AudioTagger(SingleLabelsBaseModel):
-    INPUT_TYPES = (AUDIO_TYPE, "AudioPlus")
+    INPUT_TYPES = (AUDIO_PLUS_TYPE,)
 
 
 class SingleClassImageClassifier(SingleChoiceBaseModel):
