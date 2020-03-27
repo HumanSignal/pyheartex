@@ -122,6 +122,16 @@ def _duplicate_model():
     return jsonify(result or {})
 
 
+@_server.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'UP'})
+
+
+@_server.rout('/metrics', metrics=['GET'])
+def metrics():
+    return jsonify({})
+
+
 @_server.errorhandler(NoSuchJobError)
 def no_such_job_error_handler(error):
     logger.warning(f'Got error: {str(error)}')
@@ -159,4 +169,3 @@ def send_log(path):
     out = out.replace('\n[', '\n\n[')
 
     return '<pre>' + out + '</pre>'
-
