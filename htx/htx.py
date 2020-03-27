@@ -127,7 +127,7 @@ def health():
     return jsonify({'status': 'UP'})
 
 
-@_server.route('/metrics', metrics=['GET'])
+@_server.route('/metrics', methods=['GET'])
 def metrics():
     return jsonify({})
 
