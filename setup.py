@@ -11,7 +11,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='pyheartex',
-    version='0.0.3',
+    version='0.0.4',
     description='Deploying machine learning for Heartex or Label Studio',
     long_description=long_description,
     long_description_content_type='text/markdown',
