@@ -24,13 +24,16 @@ class ModelWrapper(object):
 
 class ModelManager(object):
 
+    _redis = None
+
     def __init__(
         self,
         create_model_func,
         train_script,
         model_dir='~/.heartex/models',
-        redis_host='localhost',
-        redis_port=6379,
+        redis_url='redis://localhost/0',
+        ssl_cert_reqs='required',
+        ssl_ca_certs=None,
         redis_queue='default',
         **train_kwargs
     ):
@@ -38,13 +41,17 @@ class ModelManager(object):
         self.create_model_func = create_model_func
         self.train_script = train_script
         self.train_kwargs = train_kwargs
-        self.redis_host = redis_host
-        self.redis_port = redis_port
+        self.redis_url = redis_url
+        self.redis_ssl_cert_reqs = ssl_cert_reqs
+        self.redis_ssl_ca_certs = ssl_ca_certs
 
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
 
-        self._redis = Redis(host=redis_host, port=redis_port)
+        self._redis = Redis.from_url(
+            redis_url, ssl_cert_reqs=self.redis_ssl_cert_reqs, ssl_ca_certs=self.redis_ssl_ca_certs
+        )
+
         self._redis_queue = Queue(name=redis_queue, connection=self._redis)
 
     def _remove_jobs(self, project):
@@ -172,16 +179,14 @@ class ModelManager(object):
         return results, model_version
 
     @classmethod
-    def train_script_wrapper(cls, train_script, redis_host, redis_port, model_dir, project, train_kwargs):
-        redis = Redis(host=redis_host, port=redis_port)
-
+    def train_script_wrapper(cls, train_script, model_dir, project, train_kwargs):
         project_model_dir = os.path.join(model_dir, project)
         version = generate_version()
         workdir = os.path.join(project_model_dir, version)
         os.makedirs(workdir)
         data_stream = (
             DataItem.deserialize_to_dict(serialized_item)
-            for serialized_item in redis.lrange(cls.get_tasks_key(project), 0, -1)
+            for serialized_item in cls._redis.lrange(cls.get_tasks_key(project), 0, -1)
         )
         t = time.time()
         resources = train_script(data_stream, workdir, **train_kwargs)
@@ -194,7 +199,7 @@ class ModelManager(object):
             'job_id': get_current_job().id,
             'time': time.time() - t
         })
-        redis.rpush(cls.get_job_results_key(project), job_result)
+        cls._redis.rpush(cls.get_job_results_key(project), job_result)
         return job_result
 
     def update(self, task, project, schema, retrain, params):
