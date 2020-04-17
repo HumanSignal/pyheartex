@@ -32,6 +32,7 @@ class ModelManager(object):
         train_script,
         model_dir='~/.heartex/models',
         redis_url='redis://localhost/0',
+        redis_ssl=False,
         ssl_cert_reqs='required',
         ssl_ca_certs=None,
         redis_queue='default',
@@ -42,15 +43,17 @@ class ModelManager(object):
         self.train_script = train_script
         self.train_kwargs = train_kwargs
         self.redis_url = redis_url
+        self.redis_ssl = redis_ssl
         self.redis_ssl_cert_reqs = ssl_cert_reqs
         self.redis_ssl_ca_certs = ssl_ca_certs
 
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
 
-        self._redis = Redis.from_url(
-            redis_url, ssl_cert_reqs=self.redis_ssl_cert_reqs, ssl_ca_certs=self.redis_ssl_ca_certs
-        )
+        params = {}
+        if self.redis_ssl:
+            params = {'ssl_cert_reqs': self.redis_ssl_cert_reqs, 'ssl_ca_certs': self.redis_ssl_ca_certs}
+        self._redis = Redis.from_url(redis_url, **params)
 
         self._redis_queue = Queue(name=redis_queue, connection=self._redis)
 
