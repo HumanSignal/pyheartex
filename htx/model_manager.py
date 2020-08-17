@@ -72,7 +72,7 @@ class ModelManager(object):
         train_kwargs.update(params)
         job = self._redis_queue.enqueue(
             self.train_script_wrapper,
-            args=(self.train_script, self.redis_host, self.redis_port, self.model_dir, project, train_kwargs),
+            args=(self.train_script, self.model_dir, project, train_kwargs),
             job_timeout='365d',
             ttl=-1,
             result_ttl=-1,
