@@ -42,20 +42,28 @@ class ModelManager(object):
         self.create_model_func = create_model_func
         self.train_script = train_script
         self.train_kwargs = train_kwargs
+        
         self.redis_url = redis_url
         self.redis_ssl = redis_ssl
         self.redis_ssl_cert_reqs = ssl_cert_reqs
         self.redis_ssl_ca_certs = ssl_ca_certs
+        self.redis_queue = redis_queue
 
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
 
+        self._redis, self._redis_queue = self._get_redis(redis_url, redis_ssl, redis_ssl_cert_reqs, redis_ssl_ca_certs, redis_queue)
+    
+    @classmethod
+    def _get_redis(cls, redis_url, redis_ssl, redis_ssl_cert_reqs, redis_ssl_ca_certs, redis_queue):
         params = {}
-        if self.redis_ssl:
-            params = {'ssl_cert_reqs': self.redis_ssl_cert_reqs, 'ssl_ca_certs': self.redis_ssl_ca_certs}
-        ModelManager._redis = Redis.from_url(redis_url, **params)
+        if redis_ssl:
+            params = {'ssl_cert_reqs': redis_ssl_cert_reqs, 'ssl_ca_certs': redis_ssl_ca_certs}
+        redis = Redis.from_url(redis_url, **params)
 
-        self._redis_queue = Queue(name=redis_queue, connection=self._redis)
+        redis_queue = Queue(name=redis_queue, connection=redis)
+        return redis, redis_queue
+        
 
     def _remove_jobs(self, project):
         started_registry = StartedJobRegistry(self._redis_queue.name, self._redis_queue.connection)
@@ -72,7 +80,7 @@ class ModelManager(object):
         train_kwargs.update(params)
         job = self._redis_queue.enqueue(
             self.train_script_wrapper,
-            args=(self.train_script, self.model_dir, project, train_kwargs),
+            args=(self.train_script, self.model_dir, project, train_kwargs, self.redis_url, self.redis_ssl, self.redis_ssl_cert_reqs, self.redis_ssl_ca_certs, self.redis_queue),
             job_timeout='365d',
             ttl=-1,
             result_ttl=-1,
@@ -182,14 +190,15 @@ class ModelManager(object):
         return results, model_version
 
     @classmethod
-    def train_script_wrapper(cls, train_script, model_dir, project, train_kwargs):
+    def train_script_wrapper(cls, train_script, model_dir, project, train_kwargs, redis_url, redis_ssl, redis_ssl_cert_reqs, redis_ssl_ca_certs, redis_queue):
+        redis, _ = cls._get_redis(redis_url, redis_ssl, redis_ssl_cert_reqs, redis_ssl_ca_certs, redis_queue)
         project_model_dir = os.path.join(model_dir, project)
         version = generate_version()
         workdir = os.path.join(project_model_dir, version)
         os.makedirs(workdir)
         data_stream = (
             DataItem.deserialize_to_dict(serialized_item)
-            for serialized_item in cls._redis.lrange(cls.get_tasks_key(project), 0, -1)
+            for serialized_item in redis.lrange(cls.get_tasks_key(project), 0, -1)
         )
         t = time.time()
         resources = train_script(data_stream, workdir, **train_kwargs)
@@ -202,7 +211,7 @@ class ModelManager(object):
             'job_id': get_current_job().id,
             'time': time.time() - t
         })
-        cls._redis.rpush(cls.get_job_results_key(project), job_result)
+        redis.rpush(cls.get_job_results_key(project), job_result)
         return job_result
 
     def update(self, task, project, schema, retrain, params):
