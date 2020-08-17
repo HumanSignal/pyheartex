@@ -52,7 +52,7 @@ class ModelManager(object):
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
 
-        self._redis, self._redis_queue = self._get_redis(redis_url, redis_ssl, redis_ssl_cert_reqs, redis_ssl_ca_certs, redis_queue)
+        self._redis, self._redis_queue = self._get_redis(self.redis_url, self.redis_ssl, self.redis_ssl_cert_reqs, self.redis_ssl_ca_certs, self.redis_queue)
     
     @classmethod
     def _get_redis(cls, redis_url, redis_ssl, redis_ssl_cert_reqs, redis_ssl_ca_certs, redis_queue):
