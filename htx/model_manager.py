@@ -53,7 +53,7 @@ class ModelManager(object):
         params = {}
         if self.redis_ssl:
             params = {'ssl_cert_reqs': self.redis_ssl_cert_reqs, 'ssl_ca_certs': self.redis_ssl_ca_certs}
-        cls._redis = Redis.from_url(redis_url, **params)
+        ModelManager._redis = Redis.from_url(redis_url, **params)
 
         self._redis_queue = Queue(name=redis_queue, connection=self._redis)
 
