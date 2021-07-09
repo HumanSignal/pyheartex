@@ -1,4 +1,8 @@
-# pyheartex
+
+
+# DEPRECATED and NOT COMPATIBLE WITH LABEL STUDIO: NO LONGER SUPPORTED.
+Please check https://github.com/heartexlabs/label-studio-ml-backend instead
+
 
 Python interface for running ML backend server and using it for active learning & prelabeling & prediction within [Heartex platform](https://www.heartex.net)
 
